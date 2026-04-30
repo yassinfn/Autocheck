@@ -5,6 +5,12 @@ export type UILabels = {
   retour_annonce: string
   nouvelle_analyse: string
   telecharger_pdf: string
+  // PDF
+  rapport_titre: string
+  score_titre: string
+  analyse_generation: string
+  carte_grise_assurance: string
+  page: string
   // Étape 1 — Score
   score_annonce: string
   voir_detail: string
@@ -80,6 +86,11 @@ const LABELS: Record<string, UILabels> = {
     retour_annonce: "Retour à l'annonce",
     nouvelle_analyse: 'Nouvelle analyse',
     telecharger_pdf: 'Télécharger le rapport PDF',
+    rapport_titre: "Rapport d'inspection véhicule d'occasion",
+    score_titre: 'Score / 100',
+    analyse_generation: 'Analyse de génération',
+    carte_grise_assurance: 'Carte grise & assurance',
+    page: 'Page',
     score_annonce: "Score de l'annonce",
     voir_detail: 'Voir le détail des critères',
     masquer_detail: 'Masquer le détail',
@@ -145,6 +156,11 @@ const LABELS: Record<string, UILabels> = {
     retour_annonce: 'Back to listing',
     nouvelle_analyse: 'New analysis',
     telecharger_pdf: 'Download PDF Report',
+    rapport_titre: 'Used Vehicle Inspection Report',
+    score_titre: 'Score / 100',
+    analyse_generation: 'Generation Analysis',
+    carte_grise_assurance: 'Registration & Insurance',
+    page: 'Page',
     score_annonce: 'Listing Score',
     voir_detail: 'View detailed criteria',
     masquer_detail: 'Hide details',
@@ -210,6 +226,11 @@ const LABELS: Record<string, UILabels> = {
     retour_annonce: 'Volver al anuncio',
     nouvelle_analyse: 'Nuevo análisis',
     telecharger_pdf: 'Descargar informe PDF',
+    rapport_titre: 'Informe de inspeccion de vehiculo de ocasion',
+    score_titre: 'Puntuacion / 100',
+    analyse_generation: 'Analisis de generacion',
+    carte_grise_assurance: 'Matricula y seguro',
+    page: 'Pagina',
     score_annonce: 'Puntuación del anuncio',
     voir_detail: 'Ver criterios detallados',
     masquer_detail: 'Ocultar detalles',
@@ -275,6 +296,11 @@ const LABELS: Record<string, UILabels> = {
     retour_annonce: 'Voltar ao anúncio',
     nouvelle_analyse: 'Nova análise',
     telecharger_pdf: 'Descarregar relatório PDF',
+    rapport_titre: 'Relatorio de inspecao de veiculo usado',
+    score_titre: 'Pontuacao / 100',
+    analyse_generation: 'Analise de geracao',
+    carte_grise_assurance: 'Registo e seguro',
+    page: 'Pagina',
     score_annonce: 'Pontuação do anúncio',
     voir_detail: 'Ver critérios detalhados',
     masquer_detail: 'Ocultar detalhes',
@@ -340,6 +366,11 @@ const LABELS: Record<string, UILabels> = {
     retour_annonce: "Torna all'annuncio",
     nouvelle_analyse: 'Nuova analisi',
     telecharger_pdf: 'Scarica report PDF',
+    rapport_titre: 'Rapporto di ispezione veicolo usato',
+    score_titre: 'Punteggio / 100',
+    analyse_generation: 'Analisi della generazione',
+    carte_grise_assurance: 'Immatricolazione e assicurazione',
+    page: 'Pag.',
     score_annonce: 'Punteggio annuncio',
     voir_detail: 'Vedi criteri dettagliati',
     masquer_detail: 'Nascondi dettagli',
@@ -405,6 +436,11 @@ const LABELS: Record<string, UILabels> = {
     retour_annonce: 'Zurück zur Anzeige',
     nouvelle_analyse: 'Neue Analyse',
     telecharger_pdf: 'PDF-Bericht herunterladen',
+    rapport_titre: 'Gebrauchtfahrzeug-Inspektionsbericht',
+    score_titre: 'Bewertung / 100',
+    analyse_generation: 'Generationsanalyse',
+    carte_grise_assurance: 'Zulassung & Versicherung',
+    page: 'Seite',
     score_annonce: 'Anzeigenbewertung',
     voir_detail: 'Detaillierte Kriterien anzeigen',
     masquer_detail: 'Details ausblenden',

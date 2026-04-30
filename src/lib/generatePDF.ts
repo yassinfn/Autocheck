@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf'
 import type { AnalyseResult, ContactVerdict, VisiteData, DecisionFinale } from '@/types'
+import { getLabels } from '@/lib/uiLabels'
 
 // Keep latin-1 printable + euro sign (U+20AC supported by jsPDF WinAnsi encoding)
 // Strip emojis and other non-renderable chars
@@ -28,6 +29,7 @@ export function generatePDF({
   decision?: DecisionFinale
 }) {
   const { vehicule, score, reputation, depenses, detection } = analyse
+  const L = getLabels(detection.pays ?? 'France')
   // Preserve the symbol as-is (€, £, $, CHF…) without running through clean()
   const sym = detection.symbole.replace(/ | | /g, '').trim()
 
@@ -97,7 +99,7 @@ export function generatePDF({
   doc.text('AutoCheck', ML, 13)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
-  doc.text("Rapport d'inspection vehicule d'occasion", ML, 20)
+  doc.text(L.rapport_titre, ML, 20)
   const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
   doc.text(today, PW - MR, 20, { align: 'right' })
   doc.setTextColor(0, 0, 0)
@@ -112,7 +114,7 @@ export function generatePDF({
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(100, 116, 139)
-  const infoLine = `${fmt(vehicule.kilometrage)} km  |  ${fmt(vehicule.prix)} ${sym}  |  ${vehicule.nombreProprietaires} proprietaire(s)  |  ${clean(vehicule.version || vehicule.motorisation)}`
+  const infoLine = `${fmt(vehicule.kilometrage)} km  |  ${fmt(vehicule.prix)} ${sym}  |  ${vehicule.nombreProprietaires ?? '?'} ${L.proprietaires}  |  ${clean(vehicule.version || vehicule.motorisation)}`
   const infoLines = doc.splitTextToSize(infoLine, CW)
   doc.text(infoLines, ML, y)
   y += infoLines.length * 4.5 + 2
@@ -122,7 +124,7 @@ export function generatePDF({
   doc.setTextColor(0, 0, 0)
 
   // ── SCORE ───────────────────────────────────────────────────────────────────
-  sectionHeader('Score / 100')
+  sectionHeader(L.score_titre)
 
   const [sr, sg, sb] = score.total >= 75 ? [22, 163, 74]
     : score.total >= 60 ? [202, 138, 4]
@@ -166,22 +168,22 @@ export function generatePDF({
 
   if (score.pointsAttention.length > 0) {
     gap(2)
-    subHeader("Points d'attention")
+    subHeader(L.points_attention)
     score.pointsAttention.forEach(p => bullet(p, 180, 83, 9))
   }
   gap()
 
   // ── REPUTATION ──────────────────────────────────────────────────────────────
-  sectionHeader('Reputation du modele')
+  sectionHeader(L.reputation_modele)
 
   if (reputation.pointsForts.length > 0) {
-    subHeader('Points forts')
+    subHeader(L.points_forts)
     reputation.pointsForts.forEach(p => bullet(p, 22, 163, 74))
     gap(3)
   }
 
   if (reputation.problemesConnus.length > 0) {
-    subHeader('Problemes connus')
+    subHeader(L.problemes_connus)
     reputation.problemesConnus.forEach(p =>
       bullet(`${clean(p.description)} (${p.gravite}, ${p.frequence})`, 180, 83, 9)
     )
@@ -189,7 +191,7 @@ export function generatePDF({
   }
 
   if (reputation.rappelsConstructeur.length > 0) {
-    subHeader('Rappels constructeur')
+    subHeader(L.rappels)
     reputation.rappelsConstructeur.forEach(r =>
       bullet(`${r.reference} - ${clean(r.description)}`)
     )
@@ -197,13 +199,13 @@ export function generatePDF({
   }
 
   if (reputation.analyse_generation?.explication) {
-    subHeader('Analyse de generation')
+    subHeader(L.analyse_generation)
     bodyText(reputation.analyse_generation.explication)
     gap(3)
   }
 
   // ── DEPENSES ────────────────────────────────────────────────────────────────
-  sectionHeader('Depenses a prevoir')
+  sectionHeader(L.depenses)
 
   const PRICE_COL = 40
 
@@ -240,7 +242,7 @@ export function generatePDF({
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(9)
   doc.setTextColor(100, 116, 139)
-  doc.text('A FAIRE OBLIGATOIREMENT A L\'ACHAT', ML, y)
+  doc.text(L.obligatoire_achat, ML, y)
   y += 6
   doc.setTextColor(0, 0, 0)
   depenseTable(obligatoires)
@@ -253,7 +255,7 @@ export function generatePDF({
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
   doc.setTextColor(15, 23, 42)
-  doc.text('Total certain :', ML, y)
+  doc.text(L.total_certain, ML, y)
   doc.text(
     `${fmt(depenses.totalObligatoiresMin ?? 0)} - ${fmt(depenses.totalObligatoiresMax ?? 0)} ${sym}`,
     PW - MR, y, { align: 'right' }
@@ -267,12 +269,12 @@ export function generatePDF({
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(9)
     doc.setTextColor(100, 116, 139)
-    doc.text('A PREVOIR SELON RESULTATS DIAGNOSTIC', ML, y)
+    doc.text(L.selon_diagnostic, ML, y)
     y += 4
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.setTextColor(148, 163, 184)
-    doc.text('Montants non inclus dans le total — depend des resultats du diagnostic', ML, y)
+    doc.text(L.montants_non_inclus, ML, y)
     y += 6
     doc.setTextColor(0, 0, 0)
     depenseTable(eventuelles)
@@ -287,12 +289,12 @@ export function generatePDF({
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(10)
     doc.setTextColor(15, 23, 42)
-    doc.text("Frais d'achat obligatoires", ML, y)
+    doc.text(L.frais_achat, ML, y)
     y += 6
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(9)
     doc.setTextColor(100, 116, 139)
-    doc.text('CARTE GRISE & ASSURANCE', ML, y)
+    doc.text(L.carte_grise_assurance, ML, y)
     y += 6
     doc.setTextColor(0, 0, 0)
     depenseTable(fraisAchat)
@@ -530,7 +532,7 @@ export function generatePDF({
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(7)
     doc.setTextColor(148, 163, 184)
-    doc.text(`AutoCheck — Page ${i}/${total}`, PW / 2, 292, { align: 'center' })
+    doc.text(`AutoCheck — ${L.page} ${i}/${total}`, PW / 2, 292, { align: 'center' })
   }
 
   const datePart = new Date().toISOString().slice(0, 10)
