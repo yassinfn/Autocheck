@@ -233,9 +233,32 @@ export default function AnnonceInput({ onSubmit, onCacheHit, onStart, disabled, 
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Texte collé
+            Texte de l&apos;annonce
           </button>
         </div>
+
+        {inputMode === 'text' && (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-500">
+              Copiez et collez le texte complet de l&apos;annonce (titre, prix, kilométrage, description…)
+            </p>
+            <textarea
+              value={fallbackTexte}
+              onChange={(e) => setFallbackTexte(e.target.value)}
+              placeholder="Collez ici le texte complet de l'annonce..."
+              rows={10}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y"
+              disabled={disabled}
+            />
+            <button
+              onClick={handleFallbackSubmit}
+              disabled={!fallbackTexte.trim() || disabled}
+              className="w-full py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Analyser cette annonce
+            </button>
+          </div>
+        )}
 
         {inputMode === 'url' && (
           <>

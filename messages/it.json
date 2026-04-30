@@ -34,6 +34,7 @@
     "anomalie_km": "Anomalia chilometrica rilevata",
     "anomalie_km_detail": "il contachilometri potrebbe essere stato manomesso. Richiedere una spiegazione prima dell'acquisto.",
     "modifier_relancer": "Modifica / Riavvia",
+    "texte_colle": "Testo dell'annuncio",
     "gravite_faible": "Bassa",
     "gravite_modere": "Moderata",
     "gravite_eleve": "Alta",

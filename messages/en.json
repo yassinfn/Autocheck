@@ -34,6 +34,7 @@
     "anomalie_km": "Mileage anomaly detected",
     "anomalie_km_detail": "the odometer may have been tampered with. Request an explanation before purchasing.",
     "modifier_relancer": "Edit / Restart",
+    "texte_colle": "Listing Text",
     "gravite_faible": "Low",
     "gravite_modere": "Moderate",
     "gravite_eleve": "High",

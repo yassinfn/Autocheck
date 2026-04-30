@@ -34,6 +34,7 @@
     "anomalie_km": "Anomalie kilométrique détectée",
     "anomalie_km_detail": "le compteur pourrait avoir été manipulé. Exigez une explication avant tout achat.",
     "modifier_relancer": "Modifier / Relancer",
+    "texte_colle": "Texte de l'annonce",
     "gravite_faible": "Faible",
     "gravite_modere": "Modéré",
     "gravite_eleve": "Élevé",
