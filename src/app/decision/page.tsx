@@ -34,6 +34,7 @@ export default function DecisionPage() {
   const [isFromHistory, setIsFromHistory] = useState(false)
   const [loadedAt, setLoadedAt] = useState<string | null>(null)
   const [isUpdated, setIsUpdated] = useState(false)
+  const [userChoice, setUserChoice] = useState<'acheter' | 'negocier' | 'refuser' | null>(null)
 
   useEffect(() => {
     const storedAnalyse = localStorage.getItem('autocheck_analyse')
@@ -273,6 +274,109 @@ export default function DecisionPage() {
                 </div>
               </div>
             )}
+
+            {/* Votre décision */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100">
+                <span className="text-base font-semibold text-slate-900">Votre décision</span>
+                <p className="text-sm text-slate-500 mt-0.5">Qu&apos;est-ce que vous décidez ?</p>
+              </div>
+              <div className="p-5">
+                {!userChoice ? (
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      onClick={() => { setUserChoice('acheter'); generatePDF({ analyse, contactVerdict, visite, decision }) }}
+                      className="flex-1 py-3 px-4 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors text-sm"
+                    >
+                      J&apos;achète
+                    </button>
+                    <button
+                      onClick={() => setUserChoice('negocier')}
+                      className="flex-1 py-3 px-4 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition-colors text-sm"
+                    >
+                      Je veux négocier
+                    </button>
+                    <button
+                      onClick={() => setUserChoice('refuser')}
+                      className="flex-1 py-3 px-4 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200 transition-colors text-sm"
+                    >
+                      Je n&apos;achète pas
+                    </button>
+                  </div>
+                ) : userChoice === 'acheter' ? (
+                  <div className="space-y-4">
+                    <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                      <p className="font-semibold text-green-800 text-base">Félicitations !</p>
+                      <p className="text-sm text-green-700 mt-1 leading-relaxed">
+                        Votre rapport complet a été téléchargé. Bonne route !
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => generatePDF({ analyse, contactVerdict, visite, decision })}
+                        className="px-4 py-2 border border-green-300 text-green-700 rounded-lg text-sm font-medium hover:bg-green-50 transition-colors"
+                      >
+                        ↓ Télécharger à nouveau le rapport
+                      </button>
+                      <button
+                        onClick={() => setUserChoice(null)}
+                        className="px-4 py-2 text-slate-500 hover:text-slate-700 text-sm transition-colors"
+                      >
+                        Changer de décision
+                      </button>
+                    </div>
+                  </div>
+                ) : userChoice === 'negocier' ? (
+                  <div className="space-y-4">
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+                      <p className="font-semibold text-amber-800">Stratégie de négociation</p>
+                      {decision.reductionTotale > 0 && (
+                        <div className="flex items-center justify-between bg-white rounded-lg border border-amber-200 px-4 py-3">
+                          <span className="text-sm font-medium text-amber-900">Prix cible à proposer</span>
+                          <span className="text-xl font-bold text-amber-700">
+                            {decision.prixCible.toLocaleString('fr-FR')} {analyse.detection.symbole}
+                          </span>
+                        </div>
+                      )}
+                      <p className="text-sm text-amber-700 leading-relaxed">
+                        Appuyez-vous sur les arguments listés ci-dessus pour justifier votre offre.
+                        Restez ferme mais ouvert — proposez le prix cible dès le départ sans justification,
+                        puis utilisez chaque argument si le vendeur refuse.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setUserChoice(null)}
+                      className="text-sm text-slate-500 hover:text-slate-700 transition-colors"
+                    >
+                      Changer de décision
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                      <p className="font-semibold text-slate-800">Sage décision.</p>
+                      <p className="text-sm text-slate-600 mt-1 leading-relaxed">
+                        Ne vous précipitez pas. Une meilleure annonce vous attend.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <a
+                        href="/analyse"
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                      >
+                        Chercher une autre annonce
+                      </a>
+                      <button
+                        onClick={() => setUserChoice(null)}
+                        className="px-4 py-2 text-slate-500 hover:text-slate-700 text-sm transition-colors"
+                      >
+                        Changer de décision
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
 
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4 flex items-center justify-between gap-3 flex-wrap">
               <button
