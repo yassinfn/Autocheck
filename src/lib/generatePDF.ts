@@ -533,7 +533,8 @@ export function generatePDF({
     doc.text(`AutoCheck — Page ${i}/${total}`, PW / 2, 292, { align: 'center' })
   }
 
-  const filename = `autocheck-${vehicule.marque}-${vehicule.modele}-${vehicule.annee}`
+  const datePart = new Date().toISOString().slice(0, 10)
+  const filename = `autocheck-${vehicule.marque}-${vehicule.modele}-${vehicule.annee}-${datePart}`
     .toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') + '.pdf'
   doc.save(filename)
 }

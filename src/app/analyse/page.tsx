@@ -9,6 +9,7 @@ import HistoryBlock from '@/components/analyse/HistoryBlock'
 import Spinner from '@/components/ui/Spinner'
 import StepNav from '@/components/ui/StepNav'
 import DownloadPDFButton from '@/components/ui/DownloadPDFButton'
+import BoutonTelechargement from '@/components/pdf/BoutonTelechargement'
 import { supabase } from '@/lib/supabase'
 import type { AnalyseResult, HistoryData, ContactVerdict, VisiteData, DecisionFinale } from '@/types'
 import { getOrCreateSessionId, saveAnalysis, clearRowId, restoreRowId } from '@/lib/saveAnalysis'
@@ -430,26 +431,29 @@ export default function AnalysePage() {
               <p className="text-slate-500 text-sm mt-1 mb-5">
                 Score {displayData.score.total}/100 — {displayData.score.verdict}
               </p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <button
-                  onClick={resetAnalyse}
-                  className="px-6 py-3 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200 transition-colors"
-                >
-                  ↺ Nouvelle analyse
-                </button>
-                {reputationLoading ? (
-                  <div className="px-6 py-3 bg-indigo-400 text-white rounded-lg font-medium text-center flex items-center justify-center gap-2 cursor-wait">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Analyse en cours...
-                  </div>
-                ) : (
-                  <a
-                    href="/contact"
-                    className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors text-center"
+              <div className="flex flex-col gap-3">
+                {result && <BoutonTelechargement analyse={result} />}
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <button
+                    onClick={resetAnalyse}
+                    className="px-6 py-3 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200 transition-colors"
                   >
-                    Continuer → Vendeur
-                  </a>
-                )}
+                    ↺ Nouvelle analyse
+                  </button>
+                  {reputationLoading ? (
+                    <div className="px-6 py-3 bg-indigo-400 text-white rounded-lg font-medium text-center flex items-center justify-center gap-2 cursor-wait">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Analyse en cours...
+                    </div>
+                  ) : (
+                    <a
+                      href="/contact"
+                      className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors text-center"
+                    >
+                      Continuer → Vendeur
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
           </div>

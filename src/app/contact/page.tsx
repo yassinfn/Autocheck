@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Spinner from '@/components/ui/Spinner'
 import StepNav from '@/components/ui/StepNav'
 import DownloadPDFButton from '@/components/ui/DownloadPDFButton'
+import BoutonTelechargement from '@/components/pdf/BoutonTelechargement'
 import ConfirmLeave from '@/components/ui/ConfirmLeave'
 import QuestionsBlock from '@/components/contact/QuestionsBlock'
 import ReponsesForm, { type UploadedFile } from '@/components/contact/ReponsesForm'
@@ -295,20 +296,25 @@ export default function ContactPage() {
               onVisiter={() => navigate('/visite')}
               onDecisionNow={() => navigate('/decision')}
             />
-            {/* Bottom nav */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4 flex items-center justify-between gap-3">
-              <button
-                onClick={() => navigate('/analyse')}
-                className="text-sm text-slate-500 hover:text-slate-700 transition-colors"
-              >
-                ← Retour à l&apos;annonce
-              </button>
-              <button
-                onClick={() => navigate('/visite')}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
-              >
-                Continuer → Visite
-              </button>
+            {/* PDF + Bottom nav */}
+            <div className="space-y-3">
+              {analyse && verdict && (
+                <BoutonTelechargement analyse={analyse} contact={verdict} />
+              )}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4 flex items-center justify-between gap-3">
+                <button
+                  onClick={() => navigate('/analyse')}
+                  className="text-sm text-slate-500 hover:text-slate-700 transition-colors"
+                >
+                  ← Retour à l&apos;annonce
+                </button>
+                <button
+                  onClick={() => navigate('/visite')}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                >
+                  Continuer → Visite
+                </button>
+              </div>
             </div>
           </div>
         )}
