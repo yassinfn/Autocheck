@@ -127,9 +127,22 @@ export interface ChecklistItemState extends ChecklistItemData {
   note: string
 }
 
+export type VerdictMoteur = 'sain' | 'suspect' | 'critique'
+
+export interface VideoAnalyseResult {
+  verdict_visuel: VerdictMoteur
+  detail_visuel: string
+  verdict_sonore: VerdictMoteur
+  detail_sonore: string
+  verdict_global: VerdictMoteur
+  recommandations: string
+  analyse_date: string
+}
+
 export interface VisiteData {
   items: ChecklistItemState[]
   photoAnalyses: string[]
+  videoAnalyse?: VideoAnalyseResult
 }
 
 // ─── Page 4 : Décision finale ────────────────────────────────────────────────

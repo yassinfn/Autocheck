@@ -49,6 +49,30 @@ export async function callClaudeVision(
   return block.text
 }
 
+export async function callClaudeVisionMulti(
+  images: { data: string; mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp' }[],
+  prompt: string,
+  maxTokens = 1500
+): Promise<string> {
+  const content: Anthropic.Messages.ContentBlockParam[] = [
+    ...images.map(img => ({
+      type: 'image' as const,
+      source: { type: 'base64' as const, media_type: img.mediaType, data: img.data },
+    })),
+    { type: 'text' as const, text: prompt },
+  ]
+
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: maxTokens,
+    messages: [{ role: 'user', content }],
+  })
+
+  const block = response.content[0]
+  if (block.type !== 'text') throw new Error('Unexpected content type')
+  return block.text
+}
+
 export function extractJSON<T>(text: string): T {
   // Strip markdown code fences (```json ... ``` or ``` ... ```)
   const stripped = text

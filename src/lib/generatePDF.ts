@@ -366,6 +366,39 @@ export function generatePDF({
     gap()
   }
 
+  // ── VIDEO MOTEUR ────────────────────────────────────────────────────────────
+  if (visite?.videoAnalyse) {
+    const va = visite.videoAnalyse
+    const verdictLabel = (v: string) => v === 'sain' ? 'SAIN' : v === 'suspect' ? 'SUSPECT' : 'CRITIQUE'
+    const [vr, vg, vb] = va.verdict_global === 'sain' ? [22, 163, 74]
+      : va.verdict_global === 'suspect' ? [202, 138, 4]
+      : [220, 38, 38]
+
+    sectionHeader('Analyse video moteur')
+
+    newPageIfNeeded(16)
+    doc.setFillColor(vr, vg, vb)
+    doc.rect(ML, y, CW, 9, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.setTextColor(255, 255, 255)
+    doc.text(`Verdict global : ${verdictLabel(va.verdict_global)}`, ML + 3, y + 6)
+    doc.setTextColor(0, 0, 0)
+    y += 13
+
+    subHeader(`Visuel : ${verdictLabel(va.verdict_visuel)}`)
+    bodyText(va.detail_visuel, 4)
+    gap(3)
+
+    subHeader(`Sonore : ${verdictLabel(va.verdict_sonore)}`)
+    bodyText(va.detail_sonore, 4)
+    gap(3)
+
+    subHeader('Recommandations')
+    bodyText(va.recommandations)
+    gap()
+  }
+
   // ── DECISION FINALE ─────────────────────────────────────────────────────────
   if (decision) {
     sectionHeader('Recommandation finale')

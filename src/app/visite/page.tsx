@@ -7,11 +7,13 @@ import StepNav from '@/components/ui/StepNav'
 import ConfirmLeave from '@/components/ui/ConfirmLeave'
 import ChecklistBlock from '@/components/visite/ChecklistBlock'
 import PhotoUpload from '@/components/visite/PhotoUpload'
+import VideoMoteur from '@/components/visite/VideoMoteur'
 import type {
   AnalyseResult,
   ChecklistGeneratedResult,
   ChecklistItemState,
   VisiteData,
+  VideoAnalyseResult,
 } from '@/types'
 import { getOrCreateSessionId, saveAnalysis } from '@/lib/saveAnalysis'
 
@@ -24,6 +26,7 @@ export default function VisitePage() {
   const [analyse, setAnalyse] = useState<AnalyseResult | null>(null)
   const [items, setItems] = useState<ChecklistItemState[]>([])
   const [photoAnalyses, setPhotoAnalyses] = useState<string[]>([])
+  const [videoAnalyse, setVideoAnalyse] = useState<VideoAnalyseResult | undefined>(undefined)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isFromHistory, setIsFromHistory] = useState(false)
@@ -49,6 +52,7 @@ export default function VisitePage() {
         const visitData = JSON.parse(savedVisite) as VisiteData
         setItems(visitData.items)
         setPhotoAnalyses(visitData.photoAnalyses)
+        if (visitData.videoAnalyse) setVideoAnalyse(visitData.videoAnalyse)
         originalItemsRef.current = visitData.items
         setLoading(false)
         return
@@ -105,7 +109,7 @@ export default function VisitePage() {
   }
 
   function saveAndContinue(clearDecision: boolean) {
-    const visiteData: VisiteData = { items, photoAnalyses }
+    const visiteData: VisiteData = { items, photoAnalyses, videoAnalyse }
     localStorage.setItem('autocheck_visite', JSON.stringify(visiteData))
     if (clearDecision) localStorage.removeItem('autocheck_decision')
     originalItemsRef.current = items
@@ -201,6 +205,11 @@ export default function VisitePage() {
           <>
             <ChecklistBlock items={items} onUpdate={handleUpdateItem} />
             <PhotoUpload onAnalysisComplete={a => setPhotoAnalyses(prev => [...prev, a])} />
+            <VideoMoteur
+              langue={analyse.detection.langue}
+              onAnalyse={setVideoAnalyse}
+              existingResult={videoAnalyse}
+            />
 
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
               <div className="flex items-center justify-between mb-2">

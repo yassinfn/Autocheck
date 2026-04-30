@@ -33,6 +33,8 @@ const LOADING_MESSAGES = [
   'Estimation des dépenses à prévoir...',
 ]
 
+type AnalysePartial = Omit<AnalyseResult, 'reputation'>
+
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
 }
@@ -40,6 +42,8 @@ function fmtDate(iso: string) {
 export default function AnalysePage() {
   const [step, setStep] = useState<Step>('input')
   const [result, setResult] = useState<AnalyseResult | null>(null)
+  const [streamPartial, setStreamPartial] = useState<AnalysePartial | null>(null)
+  const [reputationLoading, setReputationLoading] = useState(false)
   const [historyData, setHistoryData] = useState<HistoryData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loadingIdx, setLoadingIdx] = useState(0)
@@ -78,11 +82,16 @@ export default function AnalysePage() {
   ) {
     setStep('loading')
     setError(null)
+    setResult(null)
+    setStreamPartial(null)
+    setReputationLoading(false)
     setLoadingIdx(0)
 
     const interval = setInterval(() => {
       setLoadingIdx((prev) => Math.min(prev + 1, LOADING_MESSAGES.length - 1))
     }, 2200)
+
+    let partial: AnalysePartial | null = null
 
     try {
       const body =
@@ -90,46 +99,88 @@ export default function AnalysePage() {
           ? { type: 'image', imageData, mimeType }
           : { annonce, historyData: history }
 
-      const res = await fetch('/api/analyse', {
+      const res = await fetch('/api/analyse/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
 
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Erreur lors de l'analyse")
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error((data as { error?: string }).error || "Erreur lors de l'analyse")
+      }
 
       clearInterval(interval)
-      const parsed = data as AnalyseResult
-      const gen = parsed.reputation?.analyse_generation
-      if (gen && !gen.est_meilleure_version) {
-        const warning = `Version non optimale (${gen.generation}) — ${gen.conseil_version || gen.explication}`
-        if (!parsed.score.pointsAttention.includes(warning)) {
-          parsed.score.pointsAttention = [warning, ...parsed.score.pointsAttention]
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const parts = buffer.split('\n\n')
+        buffer = parts.pop() ?? ''
+
+        for (const part of parts) {
+          if (!part.startsWith('data: ')) continue
+          const event = JSON.parse(part.slice(6)) as { type: string; payload: unknown }
+
+          if (event.type === 'score') {
+            partial = event.payload as AnalysePartial
+            setStreamPartial(partial)
+            setReputationLoading(true)
+            setStep('results')
+            if (type !== 'image') localStorage.setItem('autocheck_annonce', annonce)
+            localStorage.removeItem('autocheck_from_history')
+            localStorage.removeItem('autocheck_loaded_at')
+            setIsFromHistory(false)
+            setLoadedAt(null)
+            setHistoryData(history ?? null)
+          } else if (event.type === 'reputation') {
+            if (!partial) continue
+            const reputation = event.payload as AnalyseResult['reputation']
+            let updated: AnalysePartial = partial
+            const gen = reputation?.analyse_generation
+            if (gen && !gen.est_meilleure_version) {
+              const warning = `Version non optimale (${gen.generation}) — ${gen.conseil_version || gen.explication}`
+              if (!partial.score.pointsAttention.includes(warning)) {
+                updated = {
+                  ...partial,
+                  score: {
+                    ...partial.score,
+                    pointsAttention: [warning, ...partial.score.pointsAttention],
+                  },
+                }
+                partial = updated
+              }
+            }
+            const fullResult: AnalyseResult = { ...updated, reputation }
+            setResult(fullResult)
+            setStreamPartial(null)
+            setReputationLoading(false)
+            localStorage.setItem('autocheck_analyse', JSON.stringify(fullResult))
+            const sourceUrl = localStorage.getItem('autocheck_source_url') ?? undefined
+            saveAnalysis({
+              sessionId: getOrCreateSessionId(),
+              analyse: fullResult,
+              stepReached: 1,
+              urlAnnonce: sourceUrl,
+            })
+          } else if (event.type === 'error') {
+            throw new Error((event.payload as { message: string }).message)
+          }
         }
       }
-      localStorage.setItem('autocheck_analyse', JSON.stringify(parsed))
-      if (type !== 'image') localStorage.setItem('autocheck_annonce', annonce)
-      localStorage.removeItem('autocheck_from_history')
-      localStorage.removeItem('autocheck_loaded_at')
-      setIsFromHistory(false)
-      setLoadedAt(null)
-      setHistoryData(history ?? null)
-      setResult(parsed)
-      setStep('results')
-      const sourceUrl = typeof window !== 'undefined'
-        ? localStorage.getItem('autocheck_source_url') ?? undefined
-        : undefined
-      saveAnalysis({
-        sessionId: getOrCreateSessionId(),
-        analyse: parsed,
-        stepReached: 1,
-        urlAnnonce: sourceUrl,
-      })
     } catch (err) {
       clearInterval(interval)
       setError(err instanceof Error ? err.message : 'Une erreur est survenue')
-      setStep('input')
+      if (!partial) {
+        setStep('input')
+        setStreamPartial(null)
+      }
+      setReputationLoading(false)
     }
   }
 
@@ -146,6 +197,8 @@ export default function AnalysePage() {
     localStorage.removeItem('autocheck_decision')
     setStep('input')
     setResult(null)
+    setStreamPartial(null)
+    setReputationLoading(false)
     setHistoryData(null)
     setError(null)
     setIsFromHistory(false)
@@ -197,6 +250,8 @@ export default function AnalysePage() {
       setStep('results')
     }
   }
+
+  const displayData = (result ?? streamPartial) as AnalyseResult | null
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -281,7 +336,7 @@ export default function AnalysePage() {
         )}
 
         {/* RESULTS STEP */}
-        {step === 'results' && result && (
+        {step === 'results' && displayData && (
           <div className="space-y-5">
             {/* History banner */}
             {isFromHistory && loadedAt && (
@@ -306,7 +361,7 @@ export default function AnalysePage() {
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="text-lg font-bold text-slate-900">
-                      {result.vehicule.marque} {result.vehicule.modele} {result.vehicule.annee}
+                      {displayData.vehicule.marque} {displayData.vehicule.modele} {displayData.vehicule.annee}
                     </h2>
                     {historyData && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-medium">
@@ -315,20 +370,20 @@ export default function AnalysePage() {
                     )}
                   </div>
                   <p className="text-sm text-slate-500 mt-0.5">
-                    {result.vehicule.version || result.vehicule.motorisation}
+                    {displayData.vehicule.version || displayData.vehicule.motorisation}
                   </p>
                   <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-500">
-                    <span>{result.vehicule.kilometrage.toLocaleString('fr-FR')} km</span>
+                    <span>{displayData.vehicule.kilometrage.toLocaleString('fr-FR')} km</span>
                     <span>•</span>
-                    <span>{result.vehicule.prix.toLocaleString('fr-FR')} {result.detection.symbole}</span>
+                    <span>{displayData.vehicule.prix.toLocaleString('fr-FR')} {displayData.detection.symbole}</span>
                     <span>•</span>
                     <span>
-                      {result.vehicule.nombreProprietaires === 1
+                      {displayData.vehicule.nombreProprietaires === 1
                         ? '1 propriétaire'
-                        : `${result.vehicule.nombreProprietaires} propriétaires`}
+                        : `${displayData.vehicule.nombreProprietaires} propriétaires`}
                     </span>
                     <span>•</span>
-                    <span>{result.detection.pays}</span>
+                    <span>{displayData.detection.pays}</span>
                   </div>
                 </div>
                 {isFromHistory && (
@@ -342,10 +397,28 @@ export default function AnalysePage() {
               </div>
             </div>
 
-            <ScoreBlock score={result.score} />
-            {historyData && <HistoryBlock history={historyData} detection={result.detection} />}
-            <ReputationBlock reputation={result.reputation} detection={result.detection} />
-            <DepensesBlock depenses={result.depenses} symbole={result.detection.symbole} />
+            <ScoreBlock score={displayData.score} />
+            {historyData && <HistoryBlock history={historyData} detection={displayData.detection} />}
+
+            {/* Réputation : skeleton pendant le chargement, données réelles quand prêtes */}
+            {reputationLoading && (
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 animate-pulse">
+                <div className="h-5 bg-slate-200 rounded w-48 mb-5" />
+                <div className="space-y-2 mb-5">
+                  <div className="h-4 bg-slate-100 rounded w-full" />
+                  <div className="h-4 bg-slate-100 rounded w-5/6" />
+                  <div className="h-4 bg-slate-100 rounded w-4/6" />
+                </div>
+                <div className="h-4 bg-slate-200 rounded w-40 mb-3" />
+                <div className="space-y-2">
+                  <div className="h-4 bg-slate-100 rounded w-full" />
+                  <div className="h-4 bg-slate-100 rounded w-3/4" />
+                </div>
+              </div>
+            )}
+            {result && <ReputationBlock reputation={result.reputation} detection={result.detection} />}
+
+            <DepensesBlock depenses={displayData.depenses} symbole={displayData.detection.symbole} />
 
             {/* CTA */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 text-center">
@@ -353,7 +426,7 @@ export default function AnalysePage() {
                 Êtes-vous toujours intéressé par cette annonce ?
               </h3>
               <p className="text-slate-500 text-sm mt-1 mb-5">
-                Score {result.score.total}/100 — {result.score.verdict}
+                Score {displayData.score.total}/100 — {displayData.score.verdict}
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <button
@@ -362,12 +435,19 @@ export default function AnalysePage() {
                 >
                   ↺ Nouvelle analyse
                 </button>
-                <a
-                  href="/contact"
-                  className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors text-center"
-                >
-                  Continuer → Vendeur
-                </a>
+                {reputationLoading ? (
+                  <div className="px-6 py-3 bg-indigo-400 text-white rounded-lg font-medium text-center flex items-center justify-center gap-2 cursor-wait">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Analyse en cours...
+                  </div>
+                ) : (
+                  <a
+                    href="/contact"
+                    className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors text-center"
+                  >
+                    Continuer → Vendeur
+                  </a>
+                )}
               </div>
             </div>
           </div>

@@ -47,3 +47,30 @@ Décris précisément ce que tu observes : état de la pièce, défauts visibles
 Sois factuel et concis. Mentionne clairement tout élément préoccupant.
 Maximum 3 phrases.`
 }
+
+export function buildVideoAnalysePrompt(audioDescription: string, langue: string, frameCount: number): string {
+  return `Tu es AutoCheck, expert en inspection de moteurs de voitures d'occasion.
+Tu reçois ${frameCount} image(s) extraite(s) d'une vidéo du compartiment moteur, ainsi qu'une analyse audio.
+
+ANALYSE AUDIO DU MOTEUR:
+${audioDescription}
+
+RÈGLES:
+1. Analyse visuelle : cherche fuites (huile, liquide de refroidissement), corrosion, câbles/tuyaux abîmés, niveaux visibles, état général
+2. Analyse sonore : évalue à partir des métriques audio fournies
+3. verdict_visuel / verdict_sonore / verdict_global : "sain", "suspect" ou "critique"
+4. "critique" = problème grave nécessitant réparation urgente avant achat
+5. "suspect" = anomalie à investiguer, potentiellement préoccupante
+6. "sain" = aucun problème apparent
+7. Réponds UNIQUEMENT avec du JSON valide (textes en ${langue})
+
+{
+  "verdict_visuel": "sain",
+  "detail_visuel": "Description factuelle de ce que les images révèlent.",
+  "verdict_sonore": "suspect",
+  "detail_sonore": "Interprétation du profil sonore.",
+  "verdict_global": "suspect",
+  "recommandations": "Conseils concrets et actionnables.",
+  "analyse_date": ""
+}`
+}
