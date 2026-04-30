@@ -161,7 +161,7 @@ export default function ContactPage() {
           <span className="font-bold text-slate-900">AutoCheck</span>
           <div className="ml-auto flex items-center gap-3">
             <a href="/historique" className="text-xs text-slate-500 hover:text-slate-700 shrink-0">Historique</a>
-            {step === 'verdict' && <DownloadPDFButton />}
+            <DownloadPDFButton />
             <StepNav current={2} navigate={navigate} />
           </div>
         </div>

@@ -264,7 +264,7 @@ export default function AnalysePage() {
           <span className="font-bold text-slate-900">AutoCheck</span>
           <div className="ml-auto flex items-center gap-3">
             <a href="/historique" className="text-xs text-slate-500 hover:text-slate-700 shrink-0">Historique</a>
-            {step === 'results' && result && <DownloadPDFButton />}
+            <DownloadPDFButton />
             <StepNav current={1} navigate={(href) => { window.location.href = href }} />
           </div>
         </div>
