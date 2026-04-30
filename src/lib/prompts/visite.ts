@@ -79,11 +79,11 @@ CATÉGORIES OBLIGATOIRES (dans cet ordre exact):
 6. Points spécifiques — basés sur les alertes et problèmes connus ci-dessus
 
 RÈGLES:
-1. Entre 16 et 22 étapes au total, bien réparties entre les 6 catégories
-2. Catégorie "Points spécifiques": 1 étape par problème connu/alerte majeure (2 à 5 étapes max)
-3. Instructions actionnables et précises — ce que la personne fait physiquement
-4. quoi_chercher: 2 à 4 éléments concrets et observables par étape
-5. si_nok: conseil pratique adapté (négocier/demander facture/contrepasser) selon gravité
+1. Entre 14 et 18 étapes au total, bien réparties entre les 6 catégories
+2. Catégorie "Points spécifiques": 1 étape par problème connu/alerte majeure (2 à 4 étapes max)
+3. Instructions courtes et actionnables — 1 à 2 phrases max, ce que la personne fait physiquement
+4. quoi_chercher: 2 à 3 éléments concrets par étape (pas plus)
+5. si_nok: conseil pratique en 1 à 2 phrases max
 6. photo_requise true pour: au moins 1 étape Extérieur, au moins 1 Compartiment moteur, toutes Dessous du véhicule, Points spécifiques à risque élevé
 7. Tous les textes en ${detection.langue}
 8. IDs au format: ext-1, ext-2, mot-1, hab-1, des-1, dem-1, spe-1, etc.
