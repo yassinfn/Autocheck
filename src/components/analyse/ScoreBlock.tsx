@@ -2,12 +2,12 @@
 
 import { useState } from 'react'
 import ScoreGauge from '@/components/ui/ScoreGauge'
-import { createT } from '@/lib/i18n'
+import { getLabels, type UILabels } from '@/lib/uiLabels'
 import type { ScoreResult, VerdictType } from '@/types'
 
 interface ScoreBlockProps {
   score: ScoreResult
-  locale?: string
+  labels?: UILabels
 }
 
 const VERDICT_CONFIG: Record<VerdictType, { bg: string; text: string; icon: string }> = {
@@ -17,15 +17,15 @@ const VERDICT_CONFIG: Record<VerdictType, { bg: string; text: string; icon: stri
   avoid:     { bg: 'bg-red-50 border-red-200', text: 'text-red-700', icon: '🚫' },
 }
 
-export default function ScoreBlock({ score, locale = 'fr' }: ScoreBlockProps) {
+export default function ScoreBlock({ score, labels }: ScoreBlockProps) {
   const [showDetails, setShowDetails] = useState(false)
   const config = VERDICT_CONFIG[score.verdictType] ?? VERDICT_CONFIG.good
-  const t = createT(locale)
+  const L = labels ?? getLabels('France')
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
-        <span className="text-base font-semibold text-slate-900">{t('analyse.score_annonce')}</span>
+        <span className="text-base font-semibold text-slate-900">{L.score_annonce}</span>
       </div>
 
       <div className="p-5 flex flex-col sm:flex-row items-center gap-6">
@@ -60,7 +60,7 @@ export default function ScoreBlock({ score, locale = 'fr' }: ScoreBlockProps) {
           className="text-sm text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
         >
           <span>{showDetails ? '▲' : '▼'}</span>
-          {showDetails ? t('analyse.masquer_detail') : t('analyse.voir_detail')}
+          {showDetails ? L.masquer_detail : L.voir_detail}
         </button>
 
         {showDetails && (

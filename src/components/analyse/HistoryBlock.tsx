@@ -1,21 +1,20 @@
-import { createT } from '@/lib/i18n'
-import { getLocaleFromCountry } from '@/lib/i18n'
+import { getLabels, type UILabels } from '@/lib/uiLabels'
 import type { HistoryData, DetectionResult } from '@/types'
 
 interface HistoryBlockProps {
   history: HistoryData
   detection: DetectionResult
-  locale?: string
+  labels?: UILabels
 }
 
-export default function HistoryBlock({ history, detection, locale }: HistoryBlockProps) {
-  const t = createT(locale ?? getLocaleFromCountry(detection.pays))
+export default function HistoryBlock({ history, detection, labels }: HistoryBlockProps) {
+  const L = labels ?? getLabels(detection.pays)
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
         <div className="flex items-center gap-2 flex-1">
-          <span className="text-base font-semibold text-slate-900">{t('analyse.historique_vehicule')}</span>
+          <span className="text-base font-semibold text-slate-900">{L.historique}</span>
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-medium">
             ✓ Autoviza vérifié
           </span>
@@ -28,14 +27,12 @@ export default function HistoryBlock({ history, detection, locale }: HistoryBloc
             <div className="text-2xl font-bold text-slate-900">
               {history.proprietaires ?? '?'}
             </div>
-            <div className="text-xs text-slate-500 mt-0.5">
-              {t('analyse.proprietaires')}
-            </div>
+            <div className="text-xs text-slate-500 mt-0.5">{L.proprietaires}</div>
           </div>
 
           <div className="bg-slate-50 rounded-lg p-3 text-center">
             <div className="text-2xl font-bold text-slate-900">{history.relevesKm.length}</div>
-            <div className="text-xs text-slate-500 mt-0.5">{t('analyse.releve_km')}</div>
+            <div className="text-xs text-slate-500 mt-0.5">{L.releve_km}</div>
           </div>
 
           <div
@@ -58,7 +55,7 @@ export default function HistoryBlock({ history, detection, locale }: HistoryBloc
               {history.coherenceKm ? '✓' : '⚠'}
             </div>
             <div className={`text-xs mt-0.5 ${history.coherenceKm ? 'text-slate-500' : 'text-red-600 font-medium'}`}>
-              {history.coherenceKm ? t('analyse.km_coherents') : t('analyse.km_suspect')}
+              {history.coherenceKm ? L.km_coherents : L.km_suspect}
             </div>
           </div>
         </div>
@@ -66,7 +63,7 @@ export default function HistoryBlock({ history, detection, locale }: HistoryBloc
         {history.relevesKm.length > 0 && (
           <div>
             <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-2">
-              {t('analyse.historique_vehicule')}
+              {L.historique}
             </p>
             <div className="space-y-1.5">
               {history.relevesKm.map((r, i) => (
@@ -87,8 +84,8 @@ export default function HistoryBlock({ history, detection, locale }: HistoryBloc
 
         {!history.coherenceKm && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-            <span className="font-medium">{t('analyse.anomalie_km')}</span>{' '}
-            — {t('analyse.anomalie_km_detail')}
+            <span className="font-medium">{L.anomalie_km}</span>{' '}
+            — {L.anomalie_km_detail}
           </div>
         )}
       </div>

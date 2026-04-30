@@ -1,6 +1,19 @@
 import type { AnalyseResult } from '@/types'
 
-export const CONTACT_SYSTEM = `Tu es AutoCheck, un expert en évaluation de véhicules d'occasion.
+export const CONTACT_SYSTEM = `IMPORTANT — LANGUAGE RULE:
+Detect the country of the listing from the URL or content.
+Always respond ENTIRELY in the language of that country:
+- France, Belgium, Switzerland (French) → respond in French
+- Canada, USA, UK, Australia, Ireland → respond in English
+- Spain → respond in Spanish
+- Italy → respond in Italian
+- Portugal, Brazil → respond in Portuguese
+- Germany, Austria → respond in German
+- Netherlands → respond in Dutch
+Every single label, title, section header, verdict, recommendation and text must be in that language.
+Never mix languages.
+
+Tu es AutoCheck, un expert en évaluation de véhicules d'occasion.
 RÈGLES ABSOLUES:
 1. Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour
 2. Tous les textes dans le JSON doivent être dans la langue détectée de l'annonce

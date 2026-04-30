@@ -1,14 +1,13 @@
 'use client'
 
 import Badge from '@/components/ui/Badge'
-import { createT } from '@/lib/i18n'
-import { getLocaleFromCountry } from '@/lib/i18n'
+import { getLabels, type UILabels } from '@/lib/uiLabels'
 import type { ReputationResult, DetectionResult, Gravite, Frequence } from '@/types'
 
 interface ReputationBlockProps {
   reputation: ReputationResult
   detection: DetectionResult
-  locale?: string
+  labels?: UILabels
 }
 
 const graviteVariant: Record<Gravite, 'green' | 'yellow' | 'orange' | 'red'> = {
@@ -23,26 +22,26 @@ const frequenceVariant: Record<Frequence, 'green' | 'yellow' | 'orange' | 'red' 
   frequent:    'orange',
 }
 
-export default function ReputationBlock({ reputation, detection, locale }: ReputationBlockProps) {
-  const t = createT(locale ?? getLocaleFromCountry(detection.pays))
+export default function ReputationBlock({ reputation, detection, labels }: ReputationBlockProps) {
+  const L = labels ?? getLabels(detection.pays)
   const hasRappels = reputation.rappelsConstructeur.length > 0
   const gen = reputation.analyse_generation
 
   const graviteLabel: Record<Gravite, string> = {
-    faible: t('analyse.gravite_faible'),
-    modere: t('analyse.gravite_modere'),
-    eleve:  t('analyse.gravite_eleve'),
+    faible: L.gravite_faible,
+    modere: L.gravite_modere,
+    eleve:  L.gravite_eleve,
   }
   const frequenceLabel: Record<Frequence, string> = {
-    rare:        t('analyse.frequence_rare'),
-    occasionnel: t('analyse.frequence_occasionnel'),
-    frequent:    t('analyse.frequence_frequent'),
+    rare:        L.frequence_rare,
+    occasionnel: L.frequence_occasionnel,
+    frequent:    L.frequence_frequent,
   }
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-        <span className="text-base font-semibold text-slate-900">{t('analyse.reputation_modele')}</span>
+        <span className="text-base font-semibold text-slate-900">{L.reputation_modele}</span>
         <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-full">
           {detection.pays}
         </span>
@@ -67,8 +66,8 @@ export default function ReputationBlock({ reputation, detection, locale }: Reput
                 }`}
               >
                 {gen.est_meilleure_version
-                  ? `${t('analyse.bonne_version')} — ${gen.generation}`
-                  : `${t('analyse.pas_meilleure_version')} — ${gen.generation}`}
+                  ? `${L.bonne_version} — ${gen.generation}`
+                  : `${L.pas_meilleure_version} — ${gen.generation}`}
               </span>
             </div>
             {gen.explication && (
@@ -103,7 +102,7 @@ export default function ReputationBlock({ reputation, detection, locale }: Reput
         {reputation.pointsForts.length > 0 && (
           <div>
             <h4 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-1.5">
-              <span>✅</span> {t('analyse.points_forts')}
+              <span>✅</span> {L.points_forts}
             </h4>
             <ul className="space-y-1.5">
               {reputation.pointsForts.map((p, i) => (
@@ -119,7 +118,7 @@ export default function ReputationBlock({ reputation, detection, locale }: Reput
         {reputation.problemesConnus.length > 0 && (
           <div>
             <h4 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-1.5">
-              <span>⚠️</span> {t('analyse.problemes_connus')}
+              <span>⚠️</span> {L.problemes_connus}
             </h4>
             <div className="space-y-2.5">
               {reputation.problemesConnus.map((prob, i) => (
@@ -127,10 +126,10 @@ export default function ReputationBlock({ reputation, detection, locale }: Reput
                   <p className="text-sm text-slate-700 mb-2">{prob.description}</p>
                   <div className="flex gap-2">
                     <Badge variant={graviteVariant[prob.gravite] ?? 'yellow'}>
-                      {t('analyse.gravite_label')} : {graviteLabel[prob.gravite] ?? prob.gravite}
+                      {L.gravite} : {graviteLabel[prob.gravite] ?? prob.gravite}
                     </Badge>
                     <Badge variant={frequenceVariant[prob.frequence] ?? 'green'}>
-                      {t('analyse.frequence_label')} : {frequenceLabel[prob.frequence] ?? prob.frequence}
+                      {L.frequence} : {frequenceLabel[prob.frequence] ?? prob.frequence}
                     </Badge>
                   </div>
                 </div>
@@ -141,7 +140,7 @@ export default function ReputationBlock({ reputation, detection, locale }: Reput
 
         <div>
           <h4 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-1.5">
-            <span>🔔</span> {t('analyse.rappels_constructeur')}
+            <span>🔔</span> {L.rappels}
           </h4>
           {hasRappels ? (
             <div className="space-y-2">
@@ -155,7 +154,7 @@ export default function ReputationBlock({ reputation, detection, locale }: Reput
               ))}
             </div>
           ) : (
-            <p className="text-sm text-slate-500 italic">{t('analyse.aucun_rappel')}</p>
+            <p className="text-sm text-slate-500 italic">{L.aucun_rappel}</p>
           )}
         </div>
       </div>

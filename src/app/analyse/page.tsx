@@ -13,7 +13,7 @@ import BoutonTelechargement from '@/components/pdf/BoutonTelechargement'
 import { supabase } from '@/lib/supabase'
 import type { AnalyseResult, HistoryData, ContactVerdict, VisiteData, DecisionFinale } from '@/types'
 import { getOrCreateSessionId, saveAnalysis, clearRowId, restoreRowId } from '@/lib/saveAnalysis'
-import { getLocaleFromCountry, createT } from '@/lib/i18n'
+import { getLabels } from '@/lib/uiLabels'
 
 interface CachedRow {
   id: string
@@ -255,8 +255,7 @@ export default function AnalysePage() {
   }
 
   const displayData = (result ?? streamPartial) as AnalyseResult | null
-  const locale = displayData ? getLocaleFromCountry(displayData.detection.pays) : 'fr'
-  const t = createT(locale)
+  const L = getLabels(displayData?.detection.pays ?? 'France')
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -384,7 +383,7 @@ export default function AnalysePage() {
                     <span>{displayData.vehicule.prix.toLocaleString('fr-FR')} {displayData.detection.symbole}</span>
                     <span>•</span>
                     <span>
-                      {displayData.vehicule.nombreProprietaires} {t('analyse.proprietaires')}
+                      {displayData.vehicule.nombreProprietaires} {L.proprietaires}
                     </span>
                     <span>•</span>
                     <span>{displayData.detection.pays}</span>
@@ -395,14 +394,14 @@ export default function AnalysePage() {
                     onClick={handleModify}
                     className="shrink-0 text-xs px-3 py-1.5 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
                   >
-                    {t('analyse.modifier_relancer')}
+                    {L.modifier_relancer}
                   </button>
                 )}
               </div>
             </div>
 
-            <ScoreBlock score={displayData.score} locale={locale} />
-            {historyData && <HistoryBlock history={historyData} detection={displayData.detection} locale={locale} />}
+            <ScoreBlock score={displayData.score} labels={L} />
+            {historyData && <HistoryBlock history={historyData} detection={displayData.detection} labels={L} />}
 
             {/* Réputation : skeleton pendant le chargement, données réelles quand prêtes */}
             {reputationLoading && (
@@ -420,14 +419,14 @@ export default function AnalysePage() {
                 </div>
               </div>
             )}
-            {result && <ReputationBlock reputation={result.reputation} detection={result.detection} locale={locale} />}
+            {result && <ReputationBlock reputation={result.reputation} detection={result.detection} labels={L} />}
 
-            <DepensesBlock depenses={displayData.depenses} symbole={displayData.detection.symbole} locale={locale} />
+            <DepensesBlock depenses={displayData.depenses} symbole={displayData.detection.symbole} labels={L} />
 
             {/* CTA */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 text-center">
               <h3 className="text-lg font-semibold text-slate-900">
-                {t('analyse.toujours_interesse')}
+                {L.toujours_interesse}
               </h3>
               <p className="text-slate-500 text-sm mt-1 mb-5">
                 Score {displayData.score.total}/100 — {displayData.score.verdict}
@@ -439,7 +438,7 @@ export default function AnalysePage() {
                     onClick={resetAnalyse}
                     className="px-6 py-3 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200 transition-colors"
                   >
-                    ↺ {t('analyse.nouvelle_analyse')}
+                    ↺ {L.nouvelle_analyse}
                   </button>
                   {reputationLoading ? (
                     <div className="px-6 py-3 bg-indigo-400 text-white rounded-lg font-medium text-center flex items-center justify-center gap-2 cursor-wait">
@@ -451,7 +450,7 @@ export default function AnalysePage() {
                       href="/contact"
                       className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors text-center"
                     >
-                      {t('analyse.continuer_vendeur')}
+                      {L.continuer_vendeur}
                     </a>
                   )}
                 </div>
