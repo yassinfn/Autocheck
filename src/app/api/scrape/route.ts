@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type { HistoryData, KmReleve } from '@/types'
 
-const SCRAPE_HEADERS = {
-  'User-Agent':
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+// ── User agents ──────────────────────────────────────────────────────────────
+
+const DESKTOP_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+const MOBILE_UA  = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1'
+
+const STATIC_HEADERS = {
+  'User-Agent': DESKTOP_UA,
   Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-  'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
+  'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
 }
+
+// ── HTML helpers ─────────────────────────────────────────────────────────────
 
 function htmlToText(html: string): string {
   return html
@@ -60,84 +66,190 @@ function parseAutovizaData(text: string): HistoryData {
   return { proprietaires, relevesKm, immatriculationVerifiee, coherenceKm, resume }
 }
 
-async function fetchWithBrowserless(targetUrl: string): Promise<string | null> {
-  const key = process.env.BROWSERLESS_API_KEY
-  if (!key) {
-    console.log('Browserless: clé absente')
-    return null
-  }
-  try {
-    console.log('Browserless: tentative pour', targetUrl)
-    const res = await fetch(
-      `https://production-sfo.browserless.io/content?token=${key}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: targetUrl,
-          bestAttempt: true,
-          waitForTimeout: 10000,
-          gotoOptions: {
-            waitUntil: 'networkidle2',
-            timeout: 30000,
-          },
-          rejectResourceTypes: ['image', 'media', 'font', 'stylesheet'],
-          userAgent: {
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          },
-          setExtraHTTPHeaders: {
-            'Accept-Language': 'fr-FR,fr;q=0.9',
-            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          },
-        }),
-        signal: AbortSignal.timeout(45_000),
-      }
-    )
-    console.log('Browserless status:', res.status)
-    if (!res.ok) {
-      const errBody = await res.text()
-      console.log('Browserless error body:', errBody.slice(0, 500))
-      return null
-    }
-    const html = await res.text()
-    console.log('Browserless content length:', html.length)
-    console.log('Browserless HTML début:', html.slice(0, 200))
-    return html
-  } catch (e) {
-    console.log('Browserless exception:', e)
-    return null
-  }
+// ── Site configuration ────────────────────────────────────────────────────────
+
+type SiteType = 'static' | 'js-light' | 'js-heavy' | 'blocked'
+
+interface SiteConfig {
+  type: SiteType
+  waitForTimeout?: number
+  waitUntil?: 'networkidle0' | 'networkidle2' | 'load' | 'domcontentloaded'
+  mobile?: boolean
+  blockedMessage?: string
 }
 
-async function fetchAutoviza(
-  url: string
-): Promise<{ data: HistoryData } | { blocked: true } | null> {
-  const html = await fetchWithBrowserless(url)
-  if (html) {
-    const text = htmlToText(html)
-    return { data: parseAutovizaData(text) }
-  }
+const BLOCKED_MSG_DEFAULT =
+  "Ce site bloque l'accès automatique. Ouvrez l'annonce, appuyez sur Ctrl+A (sélectionner tout) puis Ctrl+C (copier), et collez le texte ici."
 
+const SITE_CONFIGS: Record<string, SiteConfig> = {
+  // ── France ──
+  'lacentrale.fr':  { type: 'static' },
+  'paruvendu.fr':   { type: 'static' },
+  'largus.fr':      { type: 'static' },
+  'leboncoin.fr':   { type: 'js-heavy', waitForTimeout: 15000, waitUntil: 'networkidle0', mobile: true },
+  'autoscout24.fr': { type: 'js-light', waitForTimeout: 8000 },
+
+  // ── Europe ──
+  'autoscout24.com': { type: 'js-light', waitForTimeout: 8000 },
+  'autoscout24.de':  { type: 'js-light', waitForTimeout: 8000 },
+  'autoscout24.es':  { type: 'js-light', waitForTimeout: 8000 },
+  'autoscout24.it':  { type: 'js-light', waitForTimeout: 8000 },
+  'autoscout24.be':  { type: 'js-light', waitForTimeout: 8000 },
+  'autoscout24.nl':  { type: 'js-light', waitForTimeout: 8000 },
+  'autoscout24.pl':  { type: 'js-light', waitForTimeout: 8000 },
+  'mobile.de':       { type: 'js-light', waitForTimeout: 8000 },
+  'autotrader.co.uk':{ type: 'js-light', waitForTimeout: 8000 },
+  'gumtree.com':     { type: 'js-light', waitForTimeout: 8000 },
+  'coches.net':      { type: 'js-light', waitForTimeout: 8000 },
+  'milanuncios.com': { type: 'js-light', waitForTimeout: 8000 },
+  'subito.it':       { type: 'js-light', waitForTimeout: 8000 },
+  'blocket.se':      { type: 'js-light', waitForTimeout: 8000 },
+  'finn.no':         { type: 'js-light', waitForTimeout: 8000 },
+  'otomoto.pl':      { type: 'js-light', waitForTimeout: 8000 },
+  'autovit.ro':      { type: 'js-light', waitForTimeout: 8000 },
+
+  // ── USA / Canada ──
+  'cargurus.com':   { type: 'js-heavy', waitForTimeout: 15000, waitUntil: 'networkidle0', mobile: true },
+  'cargurus.ca':    { type: 'js-heavy', waitForTimeout: 15000, waitUntil: 'networkidle0', mobile: true },
+  'cars.com':       { type: 'js-light', waitForTimeout: 10000 },
+  'autotrader.com': { type: 'js-light', waitForTimeout: 10000 },
+  'craigslist.org': { type: 'js-light', waitForTimeout: 8000 },
+  'truecar.com':    { type: 'js-light', waitForTimeout: 10000 },
+  'ebay.com':       { type: 'js-light', waitForTimeout: 10000 },
+
+  // ── Autres pays ──
+  'olx.com':       { type: 'js-light', waitForTimeout: 8000 },
+  'dubizzle.com':  { type: 'js-light', waitForTimeout: 8000 },
+  'avito.ru':      { type: 'js-light', waitForTimeout: 8000 },
+  'mobile.bg':     { type: 'js-light', waitForTimeout: 8000 },
+
+  // ── Sites bloqués → copier-coller ──
+  'facebook.com': {
+    type: 'blocked',
+    blockedMessage: "Facebook Marketplace bloque l'accès automatique. Ouvrez l'annonce, appuyez sur Ctrl+A (sélectionner tout) puis Ctrl+C (copier), et collez le texte ici.",
+  },
+  'carmax.com': {
+    type: 'blocked',
+    blockedMessage: "CarMax bloque l'accès automatique. Ouvrez l'annonce, appuyez sur Ctrl+A puis Ctrl+C, et collez le texte ici.",
+  },
+  'ebay.com/motors': {
+    type: 'blocked',
+    blockedMessage: BLOCKED_MSG_DEFAULT,
+  },
+}
+
+function getSiteConfig(hostname: string): SiteConfig {
+  for (const [domain, config] of Object.entries(SITE_CONFIGS)) {
+    if (hostname.includes(domain)) return config
+  }
+  // Default: try js-light
+  return { type: 'js-light', waitForTimeout: 8000 }
+}
+
+// ── Content validation ────────────────────────────────────────────────────────
+
+function isValidCarListing(text: string): boolean {
+  if (text.length < 200) return false
+  const lower = text.toLowerCase()
+  const keywords = [
+    'km', 'prix', 'price', 'mileage', 'année', 'year', 'moteur', 'engine',
+    'diesel', 'essence', 'electric', 'benzin', 'petrol',
+    '€', '$', '£', 'chf', 'boite', 'cylindre', 'chevaux', ' hp', ' kw',
+    'transmission', 'gearbox', 'automatic', 'manual',
+  ]
+  return keywords.some(kw => lower.includes(kw))
+}
+
+// ── Fetchers ─────────────────────────────────────────────────────────────────
+
+async function fetchStatic(url: string): Promise<string | null> {
   try {
     const res = await fetch(url, {
-      headers: SCRAPE_HEADERS,
-      signal: AbortSignal.timeout(10_000),
+      headers: STATIC_HEADERS,
+      signal: AbortSignal.timeout(15_000),
     })
-    if (res.status === 403 || res.status === 401) return { blocked: true }
     if (!res.ok) return null
-    const html = await res.text()
-    const text = htmlToText(html)
-    return { data: parseAutovizaData(text) }
+    const ct = res.headers.get('content-type') || ''
+    if (!ct.includes('text/html')) return null
+    return await res.text()
   } catch {
     return null
   }
 }
 
-export async function POST(req: NextRequest) {
-  const BROWSERLESS_API_KEY = process.env.BROWSERLESS_API_KEY
-  console.log('BROWSERLESS_API_KEY présente:', !!BROWSERLESS_API_KEY)
-  console.log('Clé (4 premiers chars):', BROWSERLESS_API_KEY?.slice(0, 4))
+async function fetchWithBrowserless(targetUrl: string, config: SiteConfig): Promise<string | null> {
+  const key = process.env.BROWSERLESS_API_KEY
+  if (!key) return null
 
+  const ua = config.mobile ? MOBILE_UA : DESKTOP_UA
+  const isHeavy = config.type === 'js-heavy'
+
+  const body: Record<string, unknown> = {
+    url: targetUrl,
+    bestAttempt: true,
+    waitForTimeout: config.waitForTimeout ?? 8000,
+    gotoOptions: {
+      waitUntil: config.waitUntil ?? 'networkidle2',
+      timeout: isHeavy ? 50000 : 35000,
+    },
+    rejectResourceTypes: ['image', 'media', 'font', 'stylesheet'],
+    userAgent: { userAgent: ua },
+    setExtraHTTPHeaders: {
+      'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    },
+  }
+
+  if (config.mobile) {
+    body.viewport = { width: 390, height: 844, isMobile: true, deviceScaleFactor: 3 }
+  }
+
+  try {
+    const res = await fetch(
+      `https://production-sfo.browserless.io/content?token=${key}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(isHeavy ? 65_000 : 50_000),
+      }
+    )
+    if (!res.ok) {
+      const errBody = await res.text()
+      console.log('[Browserless] error', res.status, errBody.slice(0, 300))
+      return null
+    }
+    const html = await res.text()
+    console.log('[Browserless] ok, length:', html.length)
+    return html
+  } catch (e) {
+    console.log('[Browserless] exception:', e)
+    return null
+  }
+}
+
+// ── Autoviza ─────────────────────────────────────────────────────────────────
+
+async function fetchAutoviza(
+  url: string
+): Promise<{ data: HistoryData } | { blocked: true } | null> {
+  const html = await fetchWithBrowserless(url, { type: 'js-light', waitForTimeout: 6000 })
+  if (html) {
+    return { data: parseAutovizaData(htmlToText(html)) }
+  }
+  try {
+    const res = await fetch(url, { headers: STATIC_HEADERS, signal: AbortSignal.timeout(10_000) })
+    if (res.status === 403 || res.status === 401) return { blocked: true }
+    if (!res.ok) return null
+    return { data: parseAutovizaData(htmlToText(await res.text())) }
+  } catch {
+    return null
+  }
+}
+
+// ── Main handler ─────────────────────────────────────────────────────────────
+
+export async function POST(req: NextRequest) {
   try {
     const { url } = await req.json()
 
@@ -171,8 +283,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           {
             error: 'blocked',
-            message:
-              "Le rapport Autoviza bloque l'accès automatique. Copiez le contenu de la page et collez-le dans l'onglet Texte.",
+            message: "Le rapport Autoviza bloque l'accès automatique. Copiez le contenu de la page et collez-le dans l'onglet Texte.",
           },
           { status: 403 }
         )
@@ -185,86 +296,80 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // ── Generic scrape ──────────────────────────────────────────────────────
+    // ── Route by site config ────────────────────────────────────────────────
+    const config = getSiteConfig(hostname)
+    console.log(`[scrape] ${hostname} → type: ${config.type}`)
+
+    if (config.type === 'blocked') {
+      return NextResponse.json(
+        {
+          error: 'blocked',
+          message: config.blockedMessage ?? BLOCKED_MSG_DEFAULT,
+        },
+        { status: 403 }
+      )
+    }
+
+    // ── Fetch HTML ──────────────────────────────────────────────────────────
     let html: string | null = null
 
-    // Attempt 1: Browserless (real Chrome, bypasses anti-bot protection)
-    html = await fetchWithBrowserless(url)
+    if (config.type === 'static') {
+      html = await fetchStatic(url)
+      // Static fallback to Browserless if direct fetch returns no content
+      if (!html || html.length < 1000) {
+        html = await fetchWithBrowserless(url, { type: 'js-light', waitForTimeout: 6000 })
+      }
+    } else {
+      // js-light or js-heavy: Browserless first, then static fallback
+      html = await fetchWithBrowserless(url, config)
+      if (!html) {
+        console.log('[scrape] Browserless failed, trying static fetch…')
+        html = await fetchStatic(url)
+      }
+    }
 
-    // Attempt 2: direct fetch fallback
     if (!html) {
-      console.log('Browserless échoué, tentative fetch direct...')
-      let directRes: Response
-      try {
-        directRes = await fetch(url, {
-          headers: SCRAPE_HEADERS,
-          signal: AbortSignal.timeout(15_000),
-        })
-      } catch {
-        return NextResponse.json(
-          { error: 'Impossible de joindre le site' },
-          { status: 502 }
-        )
-      }
-
-      if (directRes.status === 403 || directRes.status === 401) {
-        const isLbc = hostname.includes('leboncoin.fr')
-        return NextResponse.json(
-          {
-            error: 'blocked',
-            message: isLbc
-              ? "LeBonCoin bloque le scraping automatique même avec proxy. Ouvrez l'annonce, sélectionnez tout le texte (Ctrl+A → Ctrl+C) et collez-le ici."
-              : "Ce site bloque l'accès automatique. Ouvrez l'annonce, sélectionnez tout le texte (Ctrl+A) et collez-le ici.",
-          },
-          { status: 403 }
-        )
-      }
-
-      if (!directRes.ok) {
-        return NextResponse.json(
-          { error: `Le site a retourné une erreur ${directRes.status}` },
-          { status: 502 }
-        )
-      }
-
-      const contentType = directRes.headers.get('content-type') || ''
-      if (!contentType.includes('text/html')) {
-        return NextResponse.json(
-          { error: "Le contenu récupéré n'est pas une page HTML" },
-          { status: 400 }
-        )
-      }
-
-      html = await directRes.text()
+      return NextResponse.json(
+        {
+          error: 'blocked',
+          message: BLOCKED_MSG_DEFAULT,
+        },
+        { status: 403 }
+      )
     }
 
     const annonceText = htmlToText(html).slice(0, 8000)
 
-    // ── LeBonCoin: look for Autoviza link ───────────────────────────────────
-    if (hostname.includes('leboncoin.fr')) {
-      const autovizaUrl = findAutovizaUrl(html)
+    // ── Validate content ────────────────────────────────────────────────────
+    if (!isValidCarListing(annonceText)) {
+      return NextResponse.json(
+        {
+          error: 'invalid_content',
+          message: "La page récupérée ne semble pas être une annonce de véhicule. Vérifiez l'URL ou copiez-collez le texte de l'annonce directement.",
+        },
+        { status: 422 }
+      )
+    }
 
-      if (autovizaUrl) {
-        const autovizaResult = await fetchAutoviza(autovizaUrl)
+    // ── Autoviza detection (all sites) ──────────────────────────────────────
+    const autovizaUrl = findAutovizaUrl(html)
 
-        if (autovizaResult && !('blocked' in autovizaResult)) {
-          return NextResponse.json({
-            text: annonceText,
-            hasHistory: true,
-            historySource: 'autoviza',
-            historyData: autovizaResult.data,
-          })
-        }
-
+    if (autovizaUrl) {
+      const autovizaResult = await fetchAutoviza(autovizaUrl)
+      if (autovizaResult && !('blocked' in autovizaResult)) {
         return NextResponse.json({
           text: annonceText,
-          hasHistory: false,
-          autovizaUrl,
+          hasHistory: true,
+          historySource: 'autoviza',
+          historyData: autovizaResult.data,
         })
       }
+      // Found URL but couldn't fetch → return URL for manual entry
+      return NextResponse.json({ text: annonceText, hasHistory: false, autovizaUrl })
     }
 
     return NextResponse.json({ text: annonceText, hasHistory: false })
+
   } catch (error) {
     console.error('[API /scrape]', error)
     if (error instanceof Error && error.name === 'TimeoutError') {

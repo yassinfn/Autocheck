@@ -124,6 +124,14 @@ export default function AnnonceInput({ onSubmit, onCacheHit, onStart, disabled, 
         return
       }
 
+      if (res.status === 422) {
+        // Content fetched but doesn't look like a car listing
+        setShowFallback(true)
+        setScrapeError(data.message)
+        setScraping(false)
+        return
+      }
+
       if (!res.ok) {
         setScrapeError(data.error || 'Impossible de récupérer la page')
         setScraping(false)
@@ -240,7 +248,7 @@ export default function AnnonceInput({ onSubmit, onCacheHit, onStart, disabled, 
         {inputMode === 'url' && (
           <>
             <p className="text-sm text-slate-500">
-              Collez l&apos;URL de l&apos;annonce (leboncoin, lacentrale, autoscout24, etc.)
+              Collez l&apos;URL de l&apos;annonce (leboncoin, lacentrale, autoscout24, mobile.de, autotrader, cargurus, olx, subito, otomoto…)
             </p>
 
             <div className="flex gap-2">
