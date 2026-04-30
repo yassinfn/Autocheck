@@ -205,32 +205,47 @@ export function generatePDF({
   // ── DEPENSES ────────────────────────────────────────────────────────────────
   sectionHeader('Depenses a prevoir')
 
-  // Reserve right column width for price (e.g. "4 160 €" = ~18mm at 9pt)
   const PRICE_COL = 40
 
-  depenses.items.forEach(item => {
-    const priceText = `${fmt(item.montantMin)} - ${fmt(item.montantMax)} ${sym}`
-    const posteLines = doc.splitTextToSize(clean(item.poste), CW - PRICE_COL)
-    newPageIfNeeded(posteLines.length * 5 + (item.detail ? 8 : 0) + 3)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(9)
-    doc.setTextColor(30, 41, 59)
-    doc.text(posteLines, ML, y)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(100, 116, 139)
-    doc.text(priceText, PW - MR, y, { align: 'right' })
-    y += posteLines.length * 5
-    if (item.detail) {
-      doc.setFontSize(8)
-      const dl = doc.splitTextToSize(clean(item.detail), CW - 6)
+  function depenseTable(items: typeof depenses.obligatoires) {
+    items.forEach(item => {
+      const priceText = `${fmt(item.montantMin)} - ${fmt(item.montantMax)} ${sym}`
+      const posteLines = doc.splitTextToSize(clean(item.poste), CW - PRICE_COL)
+      newPageIfNeeded(posteLines.length * 5 + (item.detail ? 8 : 0) + 3)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(9)
+      doc.setTextColor(30, 41, 59)
+      doc.text(posteLines, ML, y)
+      doc.setFont('helvetica', 'normal')
       doc.setTextColor(100, 116, 139)
-      doc.text(dl, ML + 6, y)
-      y += dl.length * 4
-    }
-    y += 2
-    doc.setTextColor(0, 0, 0)
-  })
+      doc.text(priceText, PW - MR, y, { align: 'right' })
+      y += posteLines.length * 5
+      if (item.detail) {
+        doc.setFontSize(8)
+        const dl = doc.splitTextToSize(clean(item.detail), CW - 6)
+        doc.setTextColor(100, 116, 139)
+        doc.text(dl, ML + 6, y)
+        y += dl.length * 4
+      }
+      y += 2
+      doc.setTextColor(0, 0, 0)
+    })
+  }
 
+  const obligatoires = depenses.obligatoires ?? []
+  const eventuelles  = depenses.eventuelles  ?? []
+  const fraisAchat   = depenses.fraisAchat   ?? []
+
+  // Bloc 1a — Obligatoires
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  doc.setTextColor(100, 116, 139)
+  doc.text('A FAIRE OBLIGATOIREMENT A L\'ACHAT', ML, y)
+  y += 6
+  doc.setTextColor(0, 0, 0)
+  depenseTable(obligatoires)
+
+  // Total certain
   newPageIfNeeded(10)
   doc.setDrawColor(226, 232, 240)
   doc.line(ML, y, PW - MR, y)
@@ -238,10 +253,52 @@ export function generatePDF({
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
   doc.setTextColor(15, 23, 42)
-  doc.text('Total estime :', ML, y)
-  doc.text(`${fmt(depenses.totalMin)} - ${fmt(depenses.totalMax)} ${sym}`, PW - MR, y, { align: 'right' })
+  doc.text('Total certain :', ML, y)
+  doc.text(
+    `${fmt(depenses.totalObligatoiresMin ?? 0)} - ${fmt(depenses.totalObligatoiresMax ?? 0)} ${sym}`,
+    PW - MR, y, { align: 'right' }
+  )
   doc.setTextColor(0, 0, 0)
   y += 8
+
+  // Bloc 1b — Eventuelles
+  if (eventuelles.length > 0) {
+    gap(3)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.setTextColor(100, 116, 139)
+    doc.text('A PREVOIR SELON RESULTATS DIAGNOSTIC', ML, y)
+    y += 4
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(148, 163, 184)
+    doc.text('Montants non inclus dans le total — depend des resultats du diagnostic', ML, y)
+    y += 6
+    doc.setTextColor(0, 0, 0)
+    depenseTable(eventuelles)
+  }
+
+  // Bloc 2 — Frais d'achat
+  if (fraisAchat.length > 0) {
+    gap(4)
+    doc.setDrawColor(226, 232, 240)
+    doc.line(ML, y, PW - MR, y)
+    y += 6
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.setTextColor(15, 23, 42)
+    doc.text("Frais d'achat obligatoires", ML, y)
+    y += 6
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.setTextColor(100, 116, 139)
+    doc.text('CARTE GRISE & ASSURANCE', ML, y)
+    y += 6
+    doc.setTextColor(0, 0, 0)
+    depenseTable(fraisAchat)
+  }
+
+  y += 2
 
   // ── CONTACT VENDEUR ─────────────────────────────────────────────────────────
   if (contactVerdict) {

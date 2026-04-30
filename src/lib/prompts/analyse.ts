@@ -45,9 +45,11 @@ GRILLE DE SCORE (100 points total — respecte exactement ces maximums):
 - Transparence du vendeur: max 10 pts
 - Signaux de suspicion (absence de signal = 10pts): max 10 pts
 
-DÉPENSES À PRÉVOIR: utilise les PRIX RÉELS du marché local du pays détecté.
-Inclure: révision complète, pièces en fin de vie selon âge/km, kit distribution si applicable,
-immatriculation/carte grise selon le pays, assurance annuelle estimée.
+DÉPENSES À PRÉVOIR: utilise les PRIX RÉELS du marché local du pays détecté. 3 catégories:
+- obligatoires: révision complète (vidange+filtres) + diagnostics spécifiques au véhicule selon ses points d'attention (ex: diagnostic injecteurs, diagnostic chaîne distribution) — 2 à 4 postes max
+- eventuelles: remplacements potentiels selon résultats diagnostic (ex: injecteurs, FAP, EGR, distribution) — générés dynamiquement selon l'état probable du véhicule, 2 à 5 postes
+- fraisAchat: carte grise/immatriculation selon pays et puissance fiscale + assurance annuelle estimée — 2 postes exactement
+- totalObligatoiresMin/Max = somme des postes "obligatoires" UNIQUEMENT
 
 Réponds UNIQUEMENT avec ce JSON (textes en langue de l'annonce, montants sans espaces insécables):
 {
@@ -79,11 +81,17 @@ Réponds UNIQUEMENT avec ce JSON (textes en langue de l'annonce, montants sans e
     "ressentGlobal": ""
   },
   "depenses": {
-    "items": [
+    "obligatoires": [
       {"poste": "", "detail": "", "montantMin": 0, "montantMax": 0}
     ],
-    "totalMin": 0,
-    "totalMax": 0
+    "eventuelles": [
+      {"poste": "", "detail": "", "montantMin": 0, "montantMax": 0}
+    ],
+    "fraisAchat": [
+      {"poste": "", "detail": "", "montantMin": 0, "montantMax": 0}
+    ],
+    "totalObligatoiresMin": 0,
+    "totalObligatoiresMax": 0
   }
 }
 

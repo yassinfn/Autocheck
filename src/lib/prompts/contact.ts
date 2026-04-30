@@ -84,7 +84,7 @@ VÉHICULE: ${vehicule.marque} ${vehicule.modele} ${vehicule.annee} - ${vehicule.
 Kilométrage: ${vehicule.kilometrage.toLocaleString()} km | Prix demandé: ${vehicule.prix} ${detection.symbole}
 Score initial: ${score.total}/100 | Pays: ${detection.pays} | Devise: ${detection.devise} (${detection.symbole})
 
-DÉPENSES DÉJÀ ESTIMÉES: ${depenses.totalMin} à ${depenses.totalMax} ${detection.symbole}
+DÉPENSES OBLIGATOIRES ESTIMÉES: ${depenses.totalObligatoiresMin} à ${depenses.totalObligatoiresMax} ${detection.symbole}
 
 PROBLÈMES CONNUS DU MODÈLE:
 ${reputation.problemesConnus.map(p => `- ${p.description} (${p.gravite}, ${p.frequence})`).join('\n') || '- Aucun'}

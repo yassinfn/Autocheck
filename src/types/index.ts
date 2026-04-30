@@ -82,9 +82,11 @@ export interface DepenseItem {
 }
 
 export interface DepensesResult {
-  items: DepenseItem[]
-  totalMin: number
-  totalMax: number
+  obligatoires: DepenseItem[]
+  eventuelles: DepenseItem[]
+  fraisAchat: DepenseItem[]
+  totalObligatoiresMin: number
+  totalObligatoiresMax: number
 }
 
 export interface DetectionResult {

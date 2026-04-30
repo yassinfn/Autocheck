@@ -48,7 +48,7 @@ PROPRIÉTAIRES: ${vehicule.nombreProprietaires}
 
 SCORE INITIAL: ${score.total}/100 — ${score.verdict}
 POINTS D'ATTENTION: ${score.pointsAttention.join('; ') || 'aucun'}
-DÉPENSES ESTIMÉES: ${depenses.totalMin.toLocaleString()} – ${depenses.totalMax.toLocaleString()} ${detection.symbole}
+DÉPENSES OBLIGATOIRES ESTIMÉES: ${depenses.totalObligatoiresMin.toLocaleString()} – ${depenses.totalObligatoiresMax.toLocaleString()} ${detection.symbole}
 ${visiteSection}${contactSection}${existingArgs}
 
 RÈGLES POUR LA DÉCISION:
