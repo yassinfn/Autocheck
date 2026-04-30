@@ -1,7 +1,8 @@
 'use client'
 
 import VideoMoteur from '@/components/visite/VideoMoteur'
-import type { VisiteStepState, VideoAnalyseResult } from '@/types'
+import BoutonTelechargement from '@/components/pdf/BoutonTelechargement'
+import type { VisiteStepState, VideoAnalyseResult, AnalyseResult, ContactVerdict } from '@/types'
 
 interface ScenarioRecapProps {
   steps: VisiteStepState[]
@@ -12,6 +13,8 @@ interface ScenarioRecapProps {
   onVideoAnalyse: (result: VideoAnalyseResult) => void
   onValidate: () => void
   onRestart?: () => void
+  analyse?: AnalyseResult
+  contact?: ContactVerdict
 }
 
 function groupByCategorie(steps: VisiteStepState[]): Map<string, VisiteStepState[]> {
@@ -24,7 +27,7 @@ function groupByCategorie(steps: VisiteStepState[]): Map<string, VisiteStepState
 }
 
 export default function ScenarioRecap({
-  steps, marque, modele, langue, videoAnalyse, onVideoAnalyse, onValidate, onRestart,
+  steps, marque, modele, langue, videoAnalyse, onVideoAnalyse, onValidate, onRestart, analyse, contact,
 }: ScenarioRecapProps) {
   const ok    = steps.filter(s => s.statut === 'ok').length
   const nok   = steps.filter(s => s.statut === 'nok').length
@@ -144,6 +147,14 @@ export default function ScenarioRecap({
           <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800">
             {pend} étape{pend > 1 ? 's' : ''} non complétée{pend > 1 ? 's' : ''} — vous pouvez quand même valider.
           </div>
+        )}
+
+        {analyse && (
+          <BoutonTelechargement
+            analyse={analyse}
+            contact={contact}
+            visite={{ steps, videoAnalyse }}
+          />
         )}
 
         <button

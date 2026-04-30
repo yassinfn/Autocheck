@@ -7,6 +7,7 @@ import StepNav from '@/components/ui/StepNav'
 import type { AnalyseResult, VisiteData, ContactVerdict, DecisionFinale, DecisionType } from '@/types'
 import { getOrCreateSessionId, saveAnalysis } from '@/lib/saveAnalysis'
 import { generatePDF } from '@/lib/generatePDF'
+import BoutonTelechargement from '@/components/pdf/BoutonTelechargement'
 
 const DECISION_CONFIG: Record<DecisionType, {
   bg: string; border: string; text: string; icon: string; label: string
@@ -378,6 +379,13 @@ export default function DecisionPage() {
               </div>
             </div>
 
+            <BoutonTelechargement
+              analyse={analyse}
+              contact={contactVerdict}
+              visite={visite}
+              decision={decision}
+            />
+
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4 flex items-center justify-between gap-3 flex-wrap">
               <button
                 onClick={() => { window.location.href = '/visite' }}
@@ -392,12 +400,6 @@ export default function DecisionPage() {
                   className="px-4 py-2 border border-slate-300 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 disabled:opacity-50 transition-colors"
                 >
                   ↺ Recalculer
-                </button>
-                <button
-                  onClick={() => generatePDF({ analyse, contactVerdict, visite, decision })}
-                  className="px-4 py-2 border border-indigo-300 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-50 transition-colors"
-                >
-                  ↓ Rapport PDF
                 </button>
                 <a
                   href="/analyse"

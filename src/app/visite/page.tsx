@@ -15,6 +15,7 @@ import type {
   VisiteStepState,
   VisiteData,
   VideoAnalyseResult,
+  ContactVerdict,
 } from '@/types'
 import { getOrCreateSessionId, saveAnalysis } from '@/lib/saveAnalysis'
 
@@ -27,6 +28,7 @@ function fmtDate(iso: string) {
 export default function VisitePage() {
   const router = useRouter()
   const [analyse, setAnalyse] = useState<AnalyseResult | null>(null)
+  const [contactVerdict, setContactVerdict] = useState<ContactVerdict | undefined>()
   const [phase, setPhase] = useState<Phase>('loading')
   const [stepStates, setStepStates] = useState<VisiteStepState[]>([])
   const [currentIdx, setCurrentIdx] = useState(0)
@@ -51,6 +53,9 @@ export default function VisitePage() {
 
     const data = JSON.parse(stored) as AnalyseResult
     setAnalyse(data)
+
+    const storedContact = localStorage.getItem('autocheck_contact')
+    if (storedContact) setContactVerdict(JSON.parse(storedContact) as ContactVerdict)
 
     const fromHistory = localStorage.getItem('autocheck_from_history') === 'true'
     setIsFromHistory(fromHistory)
@@ -281,6 +286,8 @@ export default function VisitePage() {
             onVideoAnalyse={setVideoAnalyse}
             onValidate={saveAndGoToDecision}
             onRestart={handleRestart}
+            analyse={analyse}
+            contact={contactVerdict}
           />
         )}
       </main>
