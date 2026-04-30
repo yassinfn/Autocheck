@@ -10,6 +10,23 @@ RÈGLES ABSOLUES:
 
 import type { HistoryData } from '@/types'
 
+function detectKmAnomalies(relevesKm: HistoryData['relevesKm']): string[] {
+  const anomalies: string[] = []
+  const sorted = [...relevesKm].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1]
+    const curr = sorted[i]
+    const daysDiff = (new Date(curr.date).getTime() - new Date(prev.date).getTime()) / (1000 * 60 * 60 * 24)
+    const kmDiff = curr.km - prev.km
+    if (daysDiff > 0 && daysDiff <= 31 && kmDiff > 2000) {
+      anomalies.push(
+        `⚠️⚠️ ANOMALIE KILOMÉTRIQUE DÉTECTÉE — +${kmDiff.toLocaleString('fr-FR')} km en ${Math.round(daysDiff)} jour(s) entre le ${prev.date} (${prev.km.toLocaleString('fr-FR')} km) et le ${curr.date} (${curr.km.toLocaleString('fr-FR')} km). Vérifier si le compteur a été falsifié.`
+      )
+    }
+  }
+  return anomalies
+}
+
 function buildHistorySection(h: HistoryData): string {
   const lines: string[] = [
     '=== RAPPORT D\'HISTORIQUE OFFICIEL AUTOVIZA (données vérifiées — priorité absolue sur l\'annonce) ===',
@@ -20,9 +37,16 @@ function buildHistorySection(h: HistoryData): string {
   lines.push(`Cohérence kilométrique: ${h.coherenceKm ? 'OUI' : 'ANOMALIE DÉTECTÉE'}`)
   if (h.relevesKm.length > 0)
     lines.push(
-      `Relevés km: ${h.relevesKm.map(r => `${r.km.toLocaleString()} km (${r.date})`).join(' | ')}`
+      `Relevés km: ${h.relevesKm.map(r => `${r.km.toLocaleString()} km (${r.date}${r.source ? ` — ${r.source}` : ''})`).join(' | ')}`
     )
-  if (h.resume) lines.push(`\nDétail:\n${h.resume.slice(0, 800)}`)
+
+  const kmAnomalies = detectKmAnomalies(h.relevesKm)
+  if (kmAnomalies.length > 0) {
+    lines.push('\nANOMALIES PRÉ-CALCULÉES (à inclure telles quelles dans pointsAttention):')
+    kmAnomalies.forEach(a => lines.push(a))
+  }
+
+  if (h.resume) lines.push(`\nDétail:\n${h.resume.slice(0, 1200)}`)
   lines.push('=== FIN RAPPORT AUTOVIZA ===')
   return lines.join('\n')
 }
@@ -97,7 +121,33 @@ Réponds UNIQUEMENT avec ce JSON (textes en langue de l'annonce, montants sans e
 
 verdictType doit être exactement: "excellent" (80-100), "good" (60-79), "risky" (40-59), ou "avoid" (0-39)
 Le total du score doit être la somme des points de chaque critère.
+${historySection ? `
+━━━ ANALYSE OBLIGATOIRE DU RAPPORT AUTOVIZA ━━━
 
+Si un rapport Autoviza est présent, tu DOIS analyser le champ "Détail" pour détecter ces 4 patterns et ajouter les alertes correspondantes dans pointsAttention. Rédige les alertes dans la langue de l'annonce.
+
+PATTERN 1 — ACQUISITION PAR SOCIÉTÉ
+Si "Détail" mentionne un titulaire qui est une société (SARL, SAS, SA, SCI, auto-école, VTC, concessionnaire, flotte, leasing, ou tout nom commercial):
+• 1 société → ajouter dans pointsAttention: "⚠️ USAGE PROFESSIONNEL — Titulaire société : [nom]. Usage professionnel probable (flotte, VTC, commerciaux), entretien parfois négligé, usure multi-conducteurs. Exiger le carnet d'entretien complet et toutes les factures."
+• 2 sociétés différentes → ajouter: "⚠️⚠️ HISTORIQUE SUSPECT — Acquisition par 2 sociétés différentes : [société1] et [société2]. Usage professionnel intensif cumulé, risque d'entretien lacunaire. Exiger absolument toutes les factures et carnet d'entretien."
+
+PATTERN 2 — REPRISE RAPIDE PAR 2 PROFESSIONNELS
+Si 2 entités professionnelles (marchands, concessionnaires) ont chacune détenu ce véhicule et la durée entre les 2 reprises est inférieure à 3 mois:
+→ ajouter: "⚠️⚠️ HISTORIQUE SUSPECT — Repris par 2 marchands en moins de 3 mois. Pourquoi ce véhicule ne se vend-il pas ? Problème mécanique caché possible. Exiger un diagnostic complet avant toute décision."
+
+PATTERN 3 — KILOMÉTRAGE ANNUEL ÉLEVÉ
+Calcule : kilométrage annoncé ÷ (année actuelle − année du véhicule) = km/an
+Si km/an > 20 000:
+→ ajouter: "⚠️ USAGE INTENSIF — [X] km/an calculé (moyenne ~15 000 km/an). Usure accélérée sur la distribution, les freins et la boîte. Prévoir des contrôles approfondis."
+
+PATTERN 4 — ROTATION DE PROPRIÉTAIRES ÉLEVÉE
+Si nombre de propriétaires > 2 et durée de possession totale < 3 ans (selon dates disponibles ou données du rapport):
+→ ajouter: "⚠️ ROTATION ÉLEVÉE — [N] propriétaires en moins de 3 ans. Questionner systématiquement le motif de chaque revente."
+
+ANOMALIES PRÉ-CALCULÉES : si des anomalies kilométriques apparaissent dans la section "ANOMALIES PRÉ-CALCULÉES" du rapport, copie-les telles quelles dans pointsAttention.
+
+━━━ FIN RÈGLES AUTOVIZA ━━━
+` : ''}
 ANNONCE À ANALYSER:
 ${annonce}${historySection}`
 }
