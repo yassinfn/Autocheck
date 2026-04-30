@@ -149,15 +149,31 @@ function getSiteConfig(hostname: string): SiteConfig {
 // ── Content validation ────────────────────────────────────────────────────────
 
 function isValidCarListing(text: string): boolean {
-  if (text.length < 200) return false
+  if (text.length < 300) return false
   const lower = text.toLowerCase()
   const keywords = [
-    'km', 'prix', 'price', 'mileage', 'année', 'year', 'moteur', 'engine',
-    'diesel', 'essence', 'electric', 'benzin', 'petrol',
-    '€', '$', '£', 'chf', 'boite', 'cylindre', 'chevaux', ' hp', ' kw',
-    'transmission', 'gearbox', 'automatic', 'manual',
+    // Kilométrage
+    'km', 'mileage', 'miles', 'kilomètre', 'kilométrage',
+    // Prix
+    'prix', 'price', 'precio', 'prezzo', '€', '$', '£', 'chf', 'mad', 'aed',
+    // Année
+    'année', 'year', 'año', 'anno', '201', '202', '199', '200',
+    // Carburant
+    'diesel', 'essence', 'gasoline', 'petrol', 'electric', 'hybride', 'hybrid', 'électrique',
+    // Transmission
+    'manual', 'automatic', 'automatique', 'manuelle', 'boîte',
+    // Moteur
+    'moteur', 'engine', 'motor', 'cylindr', 'turbo', 'hp', 'cv', 'kw',
+    // Marques courantes
+    'toyota', 'volkswagen', 'renault', 'peugeot', 'citroen', 'ford',
+    'honda', 'bmw', 'mercedes', 'audi', 'nissan', 'hyundai', 'kia',
+    'opel', 'seat', 'skoda', 'volvo', 'mazda', 'subaru', 'mitsubishi',
+    // Termes d'annonce
+    'vendeur', 'seller', 'dealer', 'propriétaire', 'owner',
+    'used', 'occasion', 'usagé', 'segunda mano',
   ]
-  return keywords.some(kw => lower.includes(kw))
+  const matchCount = keywords.filter(kw => lower.includes(kw)).length
+  return matchCount >= 2
 }
 
 // ── Fetchers ─────────────────────────────────────────────────────────────────
@@ -340,15 +356,10 @@ export async function POST(req: NextRequest) {
 
     const annonceText = htmlToText(html).slice(0, 8000)
 
-    // ── Validate content ────────────────────────────────────────────────────
-    if (!isValidCarListing(annonceText)) {
-      return NextResponse.json(
-        {
-          error: 'invalid_content',
-          message: "La page récupérée ne semble pas être une annonce de véhicule. Vérifiez l'URL ou copiez-collez le texte de l'annonce directement.",
-        },
-        { status: 422 }
-      )
+    // ── Validate content — soft check, let Claude decide ───────────────────
+    const lowConfidence = !isValidCarListing(annonceText)
+    if (lowConfidence) {
+      console.log('[scrape] low confidence content, length:', annonceText.length)
     }
 
     // ── Autoviza detection (all sites) ──────────────────────────────────────
@@ -362,13 +373,14 @@ export async function POST(req: NextRequest) {
           hasHistory: true,
           historySource: 'autoviza',
           historyData: autovizaResult.data,
+          lowConfidence,
         })
       }
       // Found URL but couldn't fetch → return URL for manual entry
-      return NextResponse.json({ text: annonceText, hasHistory: false, autovizaUrl })
+      return NextResponse.json({ text: annonceText, hasHistory: false, autovizaUrl, lowConfidence })
     }
 
-    return NextResponse.json({ text: annonceText, hasHistory: false })
+    return NextResponse.json({ text: annonceText, hasHistory: false, lowConfidence })
 
   } catch (error) {
     console.error('[API /scrape]', error)
