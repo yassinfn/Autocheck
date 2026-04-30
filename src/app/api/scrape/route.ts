@@ -82,8 +82,9 @@ async function fetchWithBrowserless(targetUrl: string): Promise<string | null> {
             timeout: 30000,
           },
           rejectResourceTypes: ['image', 'media', 'font', 'stylesheet'],
-          userAgent:
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          userAgent: {
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          },
           setExtraHTTPHeaders: {
             'Accept-Language': 'fr-FR,fr;q=0.9',
             Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
