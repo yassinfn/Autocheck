@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react'
 import Spinner from '@/components/ui/Spinner'
 
-interface UploadedFile {
+export interface UploadedFile {
   name: string
   data: string
   mimeType: string
@@ -14,13 +14,15 @@ interface ReponsesFormProps {
   onSubmit: (reponses: string, images: { data: string; mimeType: string }[]) => void
   loading?: boolean
   initialValue?: string
+  initialFiles?: UploadedFile[]
   buttonLabel?: string
   onTextChange?: (text: string) => void
+  onFilesChange?: (files: UploadedFile[]) => void
 }
 
-export default function ReponsesForm({ onSubmit, loading, initialValue, buttonLabel, onTextChange }: ReponsesFormProps) {
+export default function ReponsesForm({ onSubmit, loading, initialValue, initialFiles, buttonLabel, onTextChange, onFilesChange }: ReponsesFormProps) {
   const [reponses, setReponses] = useState(initialValue ?? '')
-  const [files, setFiles] = useState<UploadedFile[]>([])
+  const [files, setFiles] = useState<UploadedFile[]>(initialFiles ?? [])
   const fileRef = useRef<HTMLInputElement>(null)
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -29,12 +31,16 @@ export default function ReponsesForm({ onSubmit, loading, initialValue, buttonLa
       reader.onload = (ev) => {
         const result = ev.target?.result as string
         const base64 = result.split(',')[1]
-        setFiles(prev => [...prev, {
-          name: file.name,
-          data: base64,
-          mimeType: file.type,
-          preview: file.type.startsWith('image/') ? result : undefined,
-        }])
+        setFiles(prev => {
+          const next = [...prev, {
+            name: file.name,
+            data: base64,
+            mimeType: file.type,
+            preview: file.type.startsWith('image/') ? result : undefined,
+          }]
+          onFilesChange?.(next)
+          return next
+        })
       }
       reader.readAsDataURL(file)
     })
@@ -42,7 +48,11 @@ export default function ReponsesForm({ onSubmit, loading, initialValue, buttonLa
   }
 
   function removeFile(idx: number) {
-    setFiles(prev => prev.filter((_, i) => i !== idx))
+    setFiles(prev => {
+      const next = prev.filter((_, i) => i !== idx)
+      onFilesChange?.(next)
+      return next
+    })
   }
 
   function handleSubmit() {

@@ -6,7 +6,7 @@ import Spinner from '@/components/ui/Spinner'
 import StepNav from '@/components/ui/StepNav'
 import ConfirmLeave from '@/components/ui/ConfirmLeave'
 import QuestionsBlock from '@/components/contact/QuestionsBlock'
-import ReponsesForm from '@/components/contact/ReponsesForm'
+import ReponsesForm, { type UploadedFile } from '@/components/contact/ReponsesForm'
 import VerdictBlock from '@/components/contact/VerdictBlock'
 import type { AnalyseResult, ContactQuestionsResult, ContactVerdict } from '@/types'
 import { getOrCreateSessionId, saveAnalysis } from '@/lib/saveAnalysis'
@@ -27,6 +27,8 @@ export default function ContactPage() {
   const [isFromHistory, setIsFromHistory] = useState(false)
   const [loadedAt, setLoadedAt] = useState<string | null>(null)
   const [savedResponses, setSavedResponses] = useState<string>('')
+  const [savedFiles, setSavedFiles] = useState<UploadedFile[]>([])
+  const [pendingFiles, setPendingFiles] = useState<UploadedFile[]>([])
   const [isModified, setIsModified] = useState(false)
   const [isUpdated, setIsUpdated] = useState(false)
   const [formKey, setFormKey] = useState(0)
@@ -45,6 +47,11 @@ export default function ContactPage() {
 
     const savedResp = localStorage.getItem('autocheck_contact_responses') ?? ''
     setSavedResponses(savedResp)
+
+    const savedFilesRaw = localStorage.getItem('autocheck_contact_files')
+    const savedFilesData: UploadedFile[] = savedFilesRaw ? JSON.parse(savedFilesRaw) : []
+    setSavedFiles(savedFilesData)
+    setPendingFiles(savedFilesData)
 
     if (fromHistory) {
       const savedQ = localStorage.getItem('autocheck_questions')
@@ -111,7 +118,9 @@ export default function ContactPage() {
       if (!res.ok) throw new Error(result.error)
       localStorage.setItem('autocheck_contact', JSON.stringify(result))
       localStorage.setItem('autocheck_contact_responses', reponses)
+      localStorage.setItem('autocheck_contact_files', JSON.stringify(pendingFiles))
       setSavedResponses(reponses)
+      setSavedFiles(pendingFiles)
       setVerdict(result as ContactVerdict)
       setIsModified(false)
       setIsUpdated(true)
@@ -134,6 +143,7 @@ export default function ContactPage() {
   function handleEditResponses() {
     setIsModified(false)
     setIsUpdated(false)
+    setPendingFiles(savedFiles)
     setFormKey(k => k + 1)
     setStep('questions')
   }
@@ -238,8 +248,10 @@ export default function ContactPage() {
               key={formKey}
               onSubmit={handleAnalyseReponses}
               initialValue={savedResponses}
+              initialFiles={savedFiles}
               buttonLabel={isFromHistory && savedResponses ? 'Analyser les nouvelles réponses' : undefined}
               onTextChange={(text) => setIsModified(text !== savedResponses)}
+              onFilesChange={setPendingFiles}
             />
             {/* Back nav */}
             <div className="flex items-center">
