@@ -1,16 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { callClaude, callClaudeVision, extractJSON } from '@/lib/claude'
-import { VISITE_SYSTEM, buildChecklistPrompt, buildPhotoPrompt } from '@/lib/prompts/visite'
-import type { AnalyseResult, ChecklistGeneratedResult } from '@/types'
+import { VISITE_SYSTEM, buildChecklistPrompt, buildPhotoPrompt, buildScenarioPrompt } from '@/lib/prompts/visite'
+import type { AnalyseResult, ChecklistGeneratedResult, ScenarioResult } from '@/types'
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { action, analyse, imageData, mimeType } = body as {
-      action: 'checklist' | 'photo'
+      action: 'checklist' | 'scenario' | 'photo'
       analyse?: AnalyseResult
       imageData?: string
       mimeType?: string
+    }
+
+    if (action === 'scenario') {
+      if (!analyse) {
+        return NextResponse.json({ error: 'Données manquantes' }, { status: 400 })
+      }
+      const text = await callClaude(buildScenarioPrompt(analyse), VISITE_SYSTEM, 6000)
+      const result = extractJSON<ScenarioResult>(text)
+      return NextResponse.json(result)
     }
 
     if (action === 'checklist') {

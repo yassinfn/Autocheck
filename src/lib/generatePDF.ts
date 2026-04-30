@@ -326,42 +326,78 @@ export function generatePDF({
     gap()
   }
 
-  // ── CHECKLIST VISITE ────────────────────────────────────────────────────────
-  if (visite && visite.items.length > 0) {
-    sectionHeader('Checklist de visite')
+  // ── VISITE GUIDÉE ────────────────────────────────────────────────────────────
+  if (visite) {
+    // New steps format
+    const steps = visite.steps ?? []
+    // Legacy items format fallback
+    const legacyItems = visite.items ?? []
 
-    const nokItems = visite.items.filter(i => i.statut === 'nok')
-    const okItems  = visite.items.filter(i => i.statut === 'ok')
-    const pending  = visite.items.filter(i => i.statut === 'pending')
+    if (steps.length > 0) {
+      sectionHeader('Visite guidee')
 
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
-    doc.setTextColor(71, 85, 105)
-    doc.text(`${okItems.length} OK  |  ${nokItems.length} NOK  |  ${pending.length} non verifies`, ML, y)
-    y += 7
-    doc.setTextColor(0, 0, 0)
+      const nokSteps    = steps.filter(s => s.statut === 'nok')
+      const okSteps     = steps.filter(s => s.statut === 'ok')
+      const passeSteps  = steps.filter(s => s.statut === 'passe')
+      const pendSteps   = steps.filter(s => s.statut === 'pending')
 
-    if (nokItems.length > 0) {
-      subHeader('Problemes detectes (NOK)')
-      nokItems.forEach(item => {
-        const label = item.note ? `${clean(item.point)} - ${clean(item.note)}` : clean(item.point)
-        bullet(label, 220, 38, 38)
-      })
-      gap(3)
-    }
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(71, 85, 105)
+      doc.text(
+        `${okSteps.length} OK  |  ${nokSteps.length} NOK  |  ${passeSteps.length} passes  |  ${pendSteps.length} non verifies`,
+        ML, y
+      )
+      y += 7
+      doc.setTextColor(0, 0, 0)
 
-    if (okItems.length > 0) {
-      subHeader('Points verifies (OK)')
-      okItems.forEach(item => bullet(clean(item.point), 22, 163, 74))
-      gap(3)
-    }
+      if (nokSteps.length > 0) {
+        subHeader('Problemes detectes (NOK)')
+        nokSteps.forEach(s => {
+          const label = s.commentaire
+            ? `${clean(s.titre)} - ${clean(s.commentaire)}`
+            : clean(s.titre)
+          bullet(label, 220, 38, 38)
+        })
+        gap(3)
+      }
 
-    if (visite.photoAnalyses.length > 0) {
-      subHeader('Analyses photos')
-      visite.photoAnalyses.forEach((a, i) => {
-        bodyText(`Photo ${i + 1} : ${a}`, 4)
-        gap(2)
-      })
+      if (okSteps.length > 0) {
+        subHeader('Points verifies (OK)')
+        okSteps.forEach(s => bullet(clean(s.titre), 22, 163, 74))
+        gap(3)
+      }
+    } else if (legacyItems.length > 0) {
+      sectionHeader('Checklist de visite')
+
+      const nokItems = legacyItems.filter(i => i.statut === 'nok')
+      const okItems  = legacyItems.filter(i => i.statut === 'ok')
+      const pending  = legacyItems.filter(i => i.statut === 'pending')
+
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(71, 85, 105)
+      doc.text(`${okItems.length} OK  |  ${nokItems.length} NOK  |  ${pending.length} non verifies`, ML, y)
+      y += 7
+      doc.setTextColor(0, 0, 0)
+
+      if (nokItems.length > 0) {
+        subHeader('Problemes detectes (NOK)')
+        nokItems.forEach(item => {
+          const label = item.note ? `${clean(item.point)} - ${clean(item.note)}` : clean(item.point)
+          bullet(label, 220, 38, 38)
+        })
+        gap(3)
+      }
+      if (okItems.length > 0) {
+        subHeader('Points verifies (OK)')
+        okItems.forEach(item => bullet(clean(item.point), 22, 163, 74))
+        gap(3)
+      }
+      if ((visite.photoAnalyses ?? []).length > 0) {
+        subHeader('Analyses photos')
+        visite.photoAnalyses!.forEach((a, i) => { bodyText(`Photo ${i + 1} : ${a}`, 4); gap(2) })
+      }
     }
     gap()
   }

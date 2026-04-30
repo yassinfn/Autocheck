@@ -106,25 +106,45 @@ export interface AnalyseResult {
 
 // ─── Page 3 : Visite ─────────────────────────────────────────────────────────
 
+// Legacy checklist format (kept for backward compat with old Supabase rows)
 export interface ChecklistItemData {
   id: string
   categorie: string
   point: string
   instruction: string
 }
-
 export interface ChecklistCategorie {
   nom: string
   items: Omit<ChecklistItemData, 'categorie'>[]
 }
-
 export interface ChecklistGeneratedResult {
   categories: ChecklistCategorie[]
 }
-
 export interface ChecklistItemState extends ChecklistItemData {
   statut: 'pending' | 'ok' | 'nok'
   note: string
+}
+
+// New guided scenario format
+export interface VisiteStep {
+  id: string
+  categorie: string
+  titre: string
+  instruction: string
+  quoi_chercher: string[]
+  photo_requise: boolean
+  commentaire_possible: boolean
+  si_nok: string
+}
+
+export interface VisiteStepState extends VisiteStep {
+  statut: 'pending' | 'ok' | 'nok' | 'passe'
+  commentaire: string
+  photo?: string
+}
+
+export interface ScenarioResult {
+  steps: VisiteStep[]
 }
 
 export type VerdictMoteur = 'sain' | 'suspect' | 'critique'
@@ -140,9 +160,12 @@ export interface VideoAnalyseResult {
 }
 
 export interface VisiteData {
-  items: ChecklistItemState[]
-  photoAnalyses: string[]
+  // New guided scenario format
+  steps?: VisiteStepState[]
   videoAnalyse?: VideoAnalyseResult
+  // Legacy checklist format (old Supabase rows)
+  items?: ChecklistItemState[]
+  photoAnalyses?: string[]
 }
 
 // ─── Page 4 : Décision finale ────────────────────────────────────────────────

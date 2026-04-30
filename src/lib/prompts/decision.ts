@@ -13,16 +13,26 @@ export function buildDecisionPrompt(
 ): string {
   const { vehicule, score, depenses, detection } = analyse
 
-  const nokItems = visite?.items.filter(i => i.statut === 'nok') ?? []
-  const okItems = visite?.items.filter(i => i.statut === 'ok') ?? []
+  // Support new steps format and legacy items format
+  const nokItems = visite?.steps?.filter(s => s.statut === 'nok')
+    ?? visite?.items?.filter(i => i.statut === 'nok')
+    ?? []
+  const okItems = visite?.steps?.filter(s => s.statut === 'ok')
+    ?? visite?.items?.filter(i => i.statut === 'ok')
+    ?? []
+  const passeItems = visite?.steps?.filter(s => s.statut === 'passe') ?? []
+
+  const nokText = nokItems.length > 0
+    ? nokItems.map(i => {
+        const label = 'titre' in i ? (i as { titre: string }).titre : (i as { point: string }).point
+        const note = 'commentaire' in i ? (i as { commentaire: string }).commentaire : (i as { note: string }).note
+        return `  NOK — ${label}${note ? ` (${note})` : ''}`
+      }).join('\n')
+    : '  Aucun problème détecté lors de la visite'
 
   const visiteSection = visite
-    ? `\nRÉSULTATS DE LA VISITE (${okItems.length} OK / ${nokItems.length} NOK):
-${nokItems.length > 0
-  ? nokItems.map(i => `  NOK — ${i.point}${i.note ? ` (${i.note})` : ''}`).join('\n')
-  : '  Aucun problème détecté lors de la visite'}${visite.photoAnalyses.length > 0
-  ? `\nANALYSES PHOTOS:\n${visite.photoAnalyses.map((a, i) => `  Photo ${i + 1}: ${a}`).join('\n')}`
-  : ''}`
+    ? `\nRÉSULTATS DE LA VISITE (${okItems.length} OK / ${nokItems.length} NOK / ${passeItems.length} passés):
+${nokText}`
     : ''
 
   const contactSection = contactVerdict

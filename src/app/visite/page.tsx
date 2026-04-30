@@ -1,21 +1,22 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Spinner from '@/components/ui/Spinner'
 import StepNav from '@/components/ui/StepNav'
-import ConfirmLeave from '@/components/ui/ConfirmLeave'
-import ChecklistBlock from '@/components/visite/ChecklistBlock'
-import PhotoUpload from '@/components/visite/PhotoUpload'
-import VideoMoteur from '@/components/visite/VideoMoteur'
+import ScenarioIntro from '@/components/visite/ScenarioIntro'
+import ScenarioStep from '@/components/visite/ScenarioStep'
+import ScenarioRecap from '@/components/visite/ScenarioRecap'
 import type {
   AnalyseResult,
-  ChecklistGeneratedResult,
-  ChecklistItemState,
+  ScenarioResult,
+  VisiteStepState,
   VisiteData,
   VideoAnalyseResult,
 } from '@/types'
 import { getOrCreateSessionId, saveAnalysis } from '@/lib/saveAnalysis'
+
+type Phase = 'loading' | 'error' | 'intro' | 'step' | 'recap'
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -24,25 +25,22 @@ function fmtDate(iso: string) {
 export default function VisitePage() {
   const router = useRouter()
   const [analyse, setAnalyse] = useState<AnalyseResult | null>(null)
-  const [items, setItems] = useState<ChecklistItemState[]>([])
-  const [photoAnalyses, setPhotoAnalyses] = useState<string[]>([])
-  const [videoAnalyse, setVideoAnalyse] = useState<VideoAnalyseResult | undefined>(undefined)
-  const [loading, setLoading] = useState(true)
+  const [phase, setPhase] = useState<Phase>('loading')
+  const [stepStates, setStepStates] = useState<VisiteStepState[]>([])
+  const [currentIdx, setCurrentIdx] = useState(0)
+  const [videoAnalyse, setVideoAnalyse] = useState<VideoAnalyseResult | undefined>()
   const [error, setError] = useState<string | null>(null)
   const [isFromHistory, setIsFromHistory] = useState(false)
   const [loadedAt, setLoadedAt] = useState<string | null>(null)
-  const [isModified, setIsModified] = useState(false)
-  const [isUpdated, setIsUpdated] = useState(false)
-  const [pendingHref, setPendingHref] = useState<string | null>(null)
-  const originalItemsRef = useRef<ChecklistItemState[]>([])
 
   useEffect(() => {
     const stored = localStorage.getItem('autocheck_analyse')
     if (!stored) { router.replace('/analyse'); return }
 
     const data = JSON.parse(stored) as AnalyseResult
-    const fromHistory = localStorage.getItem('autocheck_from_history') === 'true'
     setAnalyse(data)
+
+    const fromHistory = localStorage.getItem('autocheck_from_history') === 'true'
     setIsFromHistory(fromHistory)
     setLoadedAt(localStorage.getItem('autocheck_loaded_at'))
 
@@ -50,77 +48,84 @@ export default function VisitePage() {
       const savedVisite = localStorage.getItem('autocheck_visite')
       if (savedVisite) {
         const visitData = JSON.parse(savedVisite) as VisiteData
-        setItems(visitData.items)
-        setPhotoAnalyses(visitData.photoAnalyses)
-        if (visitData.videoAnalyse) setVideoAnalyse(visitData.videoAnalyse)
-        originalItemsRef.current = visitData.items
-        setLoading(false)
-        return
+        if (visitData.steps && visitData.steps.length > 0) {
+          setStepStates(visitData.steps)
+          if (visitData.videoAnalyse) setVideoAnalyse(visitData.videoAnalyse)
+          setPhase('recap')
+          return
+        }
       }
     }
 
-    generateChecklist(data)
+    generateScenario(data)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function generateChecklist(data: AnalyseResult) {
+  async function generateScenario(data: AnalyseResult) {
+    setPhase('loading')
+    setError(null)
     try {
       const res = await fetch('/api/visite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'checklist', analyse: data }),
+        body: JSON.stringify({ action: 'scenario', analyse: data }),
       })
       const result = await res.json()
       if (!res.ok) throw new Error(result.error)
 
-      const generated = result as ChecklistGeneratedResult
-      const flat: ChecklistItemState[] = generated.categories.flatMap(cat =>
-        cat.items.map(item => ({
-          ...item,
-          categorie: cat.nom,
-          statut: 'pending' as const,
-          note: '',
-        }))
-      )
-      setItems(flat)
-      originalItemsRef.current = flat
+      const scenario = result as ScenarioResult
+      const states: VisiteStepState[] = scenario.steps.map(step => ({
+        ...step,
+        statut: 'pending',
+        commentaire: '',
+      }))
+      setStepStates(states)
+      setCurrentIdx(0)
+      setPhase('intro')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors de la génération de la checklist')
+      setError(err instanceof Error ? err.message : 'Erreur lors de la génération du scénario')
+      setPhase('error')
     }
-    setLoading(false)
   }
 
-  function navigate(href: string) {
-    if (isModified) { setPendingHref(href); return }
-    window.location.href = href
+  function updateStep(idx: number, changes: Partial<VisiteStepState>) {
+    setStepStates(prev => prev.map((s, i) => i === idx ? { ...s, ...changes } : s))
   }
 
-  function handleUpdateItem(
-    id: string,
-    changes: Partial<Pick<ChecklistItemState, 'statut' | 'note'>>
-  ) {
-    setItems(prev => {
-      const next = prev.map(item => (item.id === id ? { ...item, ...changes } : item))
-      const hasChange = JSON.stringify(next) !== JSON.stringify(originalItemsRef.current)
-      setIsModified(hasChange)
-      if (hasChange) setIsUpdated(false)
-      return next
-    })
+  function handleVerdict(statut: 'ok' | 'nok' | 'passe') {
+    updateStep(currentIdx, { statut })
   }
 
-  function saveAndContinue(clearDecision: boolean) {
-    const visiteData: VisiteData = { items, photoAnalyses, videoAnalyse }
+  function handleNext() {
+    if (currentIdx >= stepStates.length - 1) {
+      setPhase('recap')
+    } else {
+      setCurrentIdx(prev => prev + 1)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
+
+  function handleRestart() {
+    const fresh = stepStates.map(s => ({
+      ...s,
+      statut: 'pending' as const,
+      commentaire: '',
+      photo: undefined,
+    }))
+    setStepStates(fresh)
+    setCurrentIdx(0)
+    setPhase('step')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function saveAndGoToDecision() {
+    if (!analyse) return
+    const visiteData: VisiteData = { steps: stepStates, videoAnalyse }
     localStorage.setItem('autocheck_visite', JSON.stringify(visiteData))
-    if (clearDecision) localStorage.removeItem('autocheck_decision')
-    originalItemsRef.current = items
-    setIsModified(false)
-    setIsUpdated(true)
+    localStorage.removeItem('autocheck_decision')
     saveAnalysis({ sessionId: getOrCreateSessionId(), visite: visiteData, stepReached: 3 })
     router.push('/decision')
   }
-
-  const evaluatedCount = items.filter(i => i.statut !== 'pending').length
-  const nokCount = items.filter(i => i.statut === 'nok').length
 
   if (!analyse) return null
 
@@ -136,16 +141,18 @@ export default function VisitePage() {
           </a>
           <span className="font-bold text-slate-900">AutoCheck</span>
           <div className="ml-auto flex items-center gap-3">
-            <a href="/historique" className="text-xs text-slate-500 hover:text-slate-700 shrink-0">Historique</a>
-            <StepNav current={3} navigate={navigate} />
+            <a href="/historique" className="text-xs text-slate-500 hover:text-slate-700 shrink-0">
+              Historique
+            </a>
+            <StepNav current={3} navigate={href => { window.location.href = href }} />
           </div>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-8 space-y-5">
+      <main className="max-w-3xl mx-auto px-4 py-6">
         {/* History banner */}
         {isFromHistory && loadedAt && (
-          <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
+          <div className="mb-4 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
             <span className="text-xs font-medium text-indigo-700">
               Analyse du {fmtDate(loadedAt)}
             </span>
@@ -160,108 +167,71 @@ export default function VisitePage() {
           </div>
         )}
 
-        {/* Véhicule résumé */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-          <div>
-            <h2 className="text-base font-bold text-slate-900">
-              {analyse.vehicule.marque} {analyse.vehicule.modele} {analyse.vehicule.annee}
-            </h2>
-            <div className="flex flex-wrap gap-2 mt-1 text-xs text-slate-500">
-              <span>{analyse.vehicule.kilometrage.toLocaleString('fr-FR')} km</span>
-              <span>•</span>
-              <span>{analyse.vehicule.prix.toLocaleString('fr-FR')} {analyse.detection.symbole}</span>
+        {phase === 'loading' && (
+          <div className="flex flex-col items-center justify-center min-h-[420px] gap-5">
+            <Spinner size="lg" />
+            <div className="text-center">
+              <p className="text-slate-800 font-semibold text-lg">Génération du scénario</p>
+              <p className="text-slate-500 text-sm mt-1 max-w-xs">
+                L&apos;IA analyse le véhicule et ses points d&apos;attention pour créer un scénario sur-mesure
+              </p>
             </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div>
-            <h1 className="text-xl font-bold text-slate-900">Visite du véhicule</h1>
-            <p className="text-slate-500 text-sm mt-0.5">
-              Vérifiez chaque point et marquez OK ou NOK. Ajoutez des photos pour une analyse automatique.
-            </p>
-          </div>
-          {(isModified || isUpdated) && (
-            <span className={`ml-auto shrink-0 text-xs px-2.5 py-1 rounded-full font-medium ${
-              isUpdated ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
-            }`}>
-              {isUpdated ? 'Mis à jour ✓' : 'Modifié — non sauvegardé'}
-            </span>
-          )}
-        </div>
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm">
-            {error}
           </div>
         )}
 
-        {loading ? (
-          <div className="flex flex-col items-center py-16 gap-4">
-            <Spinner size="lg" />
-            <p className="text-slate-500 text-sm">Génération de la checklist personnalisée...</p>
+        {phase === 'error' && (
+          <div className="bg-white rounded-xl border border-red-200 shadow-sm p-6 text-center space-y-4">
+            <p className="text-red-600 font-medium">{error}</p>
+            <button
+              onClick={() => analyse && generateScenario(analyse)}
+              className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
+            >
+              Réessayer
+            </button>
           </div>
-        ) : (
-          <>
-            <ChecklistBlock items={items} onUpdate={handleUpdateItem} />
-            <PhotoUpload onAnalysisComplete={a => setPhotoAnalyses(prev => [...prev, a])} />
-            <VideoMoteur
-              langue={analyse.detection.langue}
-              onAnalyse={setVideoAnalyse}
-              existingResult={videoAnalyse}
-            />
+        )}
 
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-slate-600">
-                  {evaluatedCount}/{items.length} points vérifiés
-                </span>
-                {nokCount > 0 && (
-                  <span className="text-sm text-red-600 font-medium">
-                    {nokCount} problème{nokCount > 1 ? 's' : ''} détecté{nokCount > 1 ? 's' : ''}
-                  </span>
-                )}
-              </div>
-              <div className="w-full h-2 bg-slate-100 rounded-full mb-5 overflow-hidden">
-                <div
-                  className="h-full bg-indigo-600 rounded-full transition-all duration-300"
-                  style={{ width: `${items.length ? (evaluatedCount / items.length) * 100 : 0}%` }}
-                />
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => navigate('/contact')}
-                  className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200 transition-colors text-sm"
-                >
-                  ← Retour au vendeur
-                </button>
-                {isModified ? (
-                  <button
-                    onClick={() => saveAndContinue(true)}
-                    className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors text-sm"
-                  >
-                    Recalculer le verdict
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => saveAndContinue(false)}
-                    className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors text-sm"
-                  >
-                    Continuer → Décision
-                  </button>
-                )}
-              </div>
-            </div>
-          </>
+        {phase === 'intro' && analyse && (
+          <ScenarioIntro
+            marque={analyse.vehicule.marque}
+            modele={analyse.vehicule.modele}
+            annee={analyse.vehicule.annee}
+            motorisation={analyse.vehicule.motorisation}
+            km={analyse.vehicule.kilometrage}
+            stepCount={stepStates.length}
+            onStart={() => { setCurrentIdx(0); setPhase('step') }}
+          />
+        )}
+
+        {phase === 'step' && stepStates[currentIdx] && (
+          <ScenarioStep
+            key={currentIdx}
+            step={stepStates[currentIdx]}
+            stepNumber={currentIdx + 1}
+            totalSteps={stepStates.length}
+            isLast={currentIdx === stepStates.length - 1}
+            onOK={() => handleVerdict('ok')}
+            onNOK={() => handleVerdict('nok')}
+            onPasse={() => handleVerdict('passe')}
+            onPhoto={base64 => updateStep(currentIdx, { photo: base64 })}
+            onCommentaire={text => updateStep(currentIdx, { commentaire: text })}
+            onNext={handleNext}
+          />
+        )}
+
+        {phase === 'recap' && (
+          <ScenarioRecap
+            steps={stepStates}
+            marque={analyse.vehicule.marque}
+            modele={analyse.vehicule.modele}
+            langue={analyse.detection.langue}
+            videoAnalyse={videoAnalyse}
+            onVideoAnalyse={setVideoAnalyse}
+            onValidate={saveAndGoToDecision}
+            onRestart={handleRestart}
+          />
         )}
       </main>
-
-      {pendingHref && (
-        <ConfirmLeave
-          onConfirm={() => { window.location.href = pendingHref }}
-          onCancel={() => setPendingHref(null)}
-        />
-      )}
     </div>
   )
 }
