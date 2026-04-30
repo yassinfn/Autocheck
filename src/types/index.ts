@@ -137,6 +137,7 @@ export interface VisiteStep {
   si_nok: string
   image_query?: string
   youtube_query?: string
+  niveau: 1 | 2
 }
 
 export interface VisiteStepState extends VisiteStep {

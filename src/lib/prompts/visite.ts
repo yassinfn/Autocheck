@@ -58,56 +58,87 @@ export function buildScenarioPrompt(analyse: AnalyseResult): string {
 
   const attentions = score.pointsAttention.map(p => `- ${p}`).join('\n') || '- Aucun'
 
-  return `Génère un scénario de visite guidée personnalisé pour l'inspection de ce véhicule d'occasion.
+  return `Génère un scénario de visite en DEUX NIVEAUX pour l'inspection de ce véhicule d'occasion.
 
 VÉHICULE: ${vehicule.marque} ${vehicule.modele} ${vehicule.annee} — ${vehicule.motorisation} ${vehicule.boite}
 KILOMÉTRAGE: ${vehicule.kilometrage.toLocaleString()} km | ÂGE: ${age} an${age > 1 ? 's' : ''}
 PRIX: ${vehicule.prix.toLocaleString()} ${detection.symbole}
 
-POINTS D'ATTENTION DÉTECTÉS À L'ÉTAPE 1:
+POINTS D'ATTENTION DÉTECTÉS:
 ${attentions}
 
 PROBLÈMES CONNUS DU MODÈLE:
 ${problemes}
 
-CATÉGORIES OBLIGATOIRES (dans cet ordre exact):
-1. Extérieur — carrosserie, vitrages, pneus, jantes
-2. Compartiment moteur — huile, liquides, courroie, fuites
-3. Habitacle — tableau de bord, voyants, équipements, odeurs
-4. Dessous du véhicule — fuites, échappement, silencieux
-5. Démarrage à froid — comportement moteur, fumées, bruits
-6. Points spécifiques — basés sur les alertes et problèmes connus ci-dessus
+━━━ NIVEAU 1 — CONTRÔLE RAPIDE (champ "niveau": 1) ━━━
+• 5 à 10 points MAXIMUM — observable par quelqu'un qui n'a jamais ouvert un capot
+• Zéro jargon technique — reformuler en action concrète et sensorielle
+  ❌ "Vérifiez l'arbre du turbocompresseur pour détecter un jeu axial"
+  ✅ "Regardez sous la voiture — y a-t-il des traces de liquide ou d'huile sur le sol ?"
+• Exemples de contrôles simples (à adapter selon ce véhicule) :
+  - Regarder sous la voiture (fuites au sol)
+  - Démarrer le moteur (voyants qui restent allumés)
+  - Observation fumée échappement
+  - État général carrosserie (bosses, rouille visible)
+  - État des pneus à l'œil
+  - Niveau d'huile sur la jauge
+  - Bruit au démarrage à froid
+  - Odeur habitacle (humidité)
+  - Équipements simples (clim, vitres électriques)
+• photo_requise: true pour 2 à 3 points seulement
+• quoi_chercher: 2 éléments max, formulés simplement
 
-RÈGLES:
-1. Entre 14 et 18 étapes au total, bien réparties entre les 6 catégories
-2. Catégorie "Points spécifiques": 1 étape par problème connu/alerte majeure (2 à 4 étapes max)
-3. Instructions courtes et actionnables — 1 à 2 phrases max, ce que la personne fait physiquement
-4. quoi_chercher: 2 à 3 éléments concrets par étape (pas plus)
-5. si_nok: conseil pratique en 1 à 2 phrases max
-6. photo_requise true pour: au moins 1 étape Extérieur, au moins 1 Compartiment moteur, toutes Dessous du véhicule, Points spécifiques à risque élevé
-7. Tous les textes en ${detection.langue}
-8. IDs au format: ext-1, ext-2, mot-1, hab-1, des-1, dem-1, spe-1, etc.
-9. image_query: requête Google Images en anglais pour illustrer CE qu'il faut inspecter sur CE modèle (ex: "Citroën C4 Picasso 1.6 HDi timing belt inspection"). Chaîne vide "" pour étapes comportementales (essai routier).
-10. youtube_query: requête YouTube en ${detection.langue} pour trouver une vidéo explicative (ex: "vérifier courroie distribution C4 Picasso 1.6 HDi"). Chaîne vide "" pour étapes comportementales.
+━━━ NIVEAU 2 — INSPECTION COMPLÈTE (champ "niveau": 2) ━━━
+• 10 à 15 points supplémentaires — plus techniques mais expliqués clairement
+• Couvre les catégories: Compartiment moteur (détail), Dessous du véhicule, Essai routier, Points spécifiques au modèle
+• Les problèmes connus du modèle (FAP, DSG, EGR, distribution, etc.) vont ici — 1 point par problème
+• Instructions: 1 à 2 phrases max, action physique claire
+• quoi_chercher: 2 à 3 éléments concrets
+• photo_requise: true pour toutes les étapes Dessous du véhicule et Points spécifiques à risque élevé
+• image_query: requête Google Images EN ANGLAIS pour illustrer l'inspection sur CE modèle. "" si non pertinent.
+• youtube_query: requête YouTube en ${detection.langue} pour vidéo explicative. "" si non pertinent.
+
+RÈGLES COMMUNES:
+1. Tous les textes en ${detection.langue}
+2. si_nok: conseil pratique en 1 à 2 phrases max
+3. IDs niveau 1: n1-1, n1-2, ... / IDs niveau 2: n2-1, n2-2, ...
+4. Les steps niveau 1 doivent apparaître EN PREMIER dans le tableau, puis les niveau 2
+5. commentaire_possible: true pour tous les points
 
 Réponds UNIQUEMENT avec ce JSON valide:
 {
   "steps": [
     {
-      "id": "ext-1",
-      "categorie": "Extérieur",
-      "titre": "Contrôle de la carrosserie",
-      "instruction": "Faites le tour complet du véhicule en vous plaçant à 1-2 mètres de chaque panneau, sous différents angles de lumière.",
+      "id": "n1-1",
+      "categorie": "Premier regard",
+      "niveau": 1,
+      "titre": "Fuites sous le véhicule",
+      "instruction": "Regardez sous la voiture avant même de la démarrer. Y a-t-il des taches ou des traces de liquide sur le sol ?",
       "quoi_chercher": [
-        "Différences de teinte entre les panneaux (signe de peinture refaite)",
-        "Traces de rouille sur les bas de caisse et passages de roues",
-        "Bosses ou rayures non mentionnées dans l'annonce"
+        "Taches d'huile sombre sous le moteur",
+        "Traces de liquide coloré (vert/rouge = liquide de refroidissement)"
+      ],
+      "photo_requise": false,
+      "commentaire_possible": true,
+      "si_nok": "Des fuites actives sont un signal sérieux. Demandez les derniers entretiens et faites vérifier par un mécanicien avant d'acheter.",
+      "image_query": "",
+      "youtube_query": ""
+    },
+    {
+      "id": "n2-1",
+      "categorie": "Compartiment moteur",
+      "niveau": 2,
+      "titre": "Couleur du liquide de refroidissement",
+      "instruction": "Ouvrez le bouchon du vase d'expansion (ne pas ouvrir moteur chaud). Regardez la couleur du liquide.",
+      "quoi_chercher": [
+        "Liquide marron ou noirâtre (signe de mélange avec huile)",
+        "Niveau sous le minimum"
       ],
       "photo_requise": true,
       "commentaire_possible": true,
-      "si_nok": "Une différence de teinte entre panneaux indique une réparation après accident. Demandez l'historique des sinistres et négociez 500 à 1 500 € selon l'étendue des réparations. Si impact majeur non déclaré, abandonnez.",
-      "image_query": "used car body panel paint difference inspection",
-      "youtube_query": "inspecter carrosserie voiture occasion"
+      "si_nok": "Un liquide trouble ou marron peut indiquer un joint de culasse défaillant — réparation coûteuse. Abandonnez ou négociez fortement.",
+      "image_query": "${vehicule.marque} ${vehicule.modele} coolant reservoir inspection",
+      "youtube_query": "vérifier liquide refroidissement voiture occasion"
     }
   ]
 }`

@@ -9,6 +9,7 @@ interface ScenarioStepProps {
   stepNumber: number
   totalSteps: number
   isLast: boolean
+  isLastNiveau1?: boolean
   vehiculeKey: string
   onOK: () => void
   onNOK: () => void
@@ -52,7 +53,7 @@ async function compressImage(file: File): Promise<string> {
 }
 
 export default function ScenarioStep({
-  step, stepNumber, totalSteps, isLast, vehiculeKey,
+  step, stepNumber, totalSteps, isLast, isLastNiveau1, vehiculeKey,
   onOK, onNOK, onPasse, onPhoto, onCommentaire, onNext,
 }: ScenarioStepProps) {
   const fileRef = useRef<HTMLInputElement>(null)
@@ -76,9 +77,16 @@ export default function ScenarioStep({
       {/* Progress */}
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-xs font-semibold text-slate-500">
-            Étape {stepNumber} / {totalSteps}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500">
+              Étape {stepNumber} / {totalSteps}
+            </span>
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+              step.niveau === 1 ? 'bg-indigo-100 text-indigo-700' : 'bg-violet-100 text-violet-700'
+            }`}>
+              {step.niveau === 1 ? 'Contrôle rapide' : 'Inspection complète'}
+            </span>
+          </div>
           <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${catColor}`}>
             {step.categorie}
           </span>
@@ -238,7 +246,7 @@ export default function ScenarioStep({
                 onClick={onNext}
                 className="w-full py-3.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors"
               >
-                {isLast ? 'Voir le récapitulatif →' : 'Étape suivante →'}
+                {isLast ? 'Voir le récapitulatif →' : isLastNiveau1 ? 'Terminer le contrôle rapide →' : 'Étape suivante →'}
               </button>
             </div>
           )}

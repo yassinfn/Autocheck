@@ -7,6 +7,7 @@ import StepNav from '@/components/ui/StepNav'
 import ScenarioIntro from '@/components/visite/ScenarioIntro'
 import ScenarioStep from '@/components/visite/ScenarioStep'
 import ScenarioRecap from '@/components/visite/ScenarioRecap'
+import LevelTransition from '@/components/visite/LevelTransition'
 import type {
   AnalyseResult,
   ScenarioResult,
@@ -16,7 +17,7 @@ import type {
 } from '@/types'
 import { getOrCreateSessionId, saveAnalysis } from '@/lib/saveAnalysis'
 
-type Phase = 'loading' | 'error' | 'intro' | 'step' | 'recap'
+type Phase = 'loading' | 'error' | 'intro' | 'step' | 'transition' | 'recap'
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -32,6 +33,16 @@ export default function VisitePage() {
   const [error, setError] = useState<string | null>(null)
   const [isFromHistory, setIsFromHistory] = useState(false)
   const [loadedAt, setLoadedAt] = useState<string | null>(null)
+
+  // Indices of niveau 1 and niveau 2 steps in the flat stepStates array
+  const niveau1Indices = stepStates
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => (s.niveau ?? 1) === 1)
+    .map(({ i }) => i)
+  const lastNiveau1Idx = niveau1Indices[niveau1Indices.length - 1] ?? -1
+
+  const niveau1Steps = stepStates.filter(s => (s.niveau ?? 1) === 1)
+  const niveau2Steps = stepStates.filter(s => s.niveau === 2)
 
   useEffect(() => {
     const stored = localStorage.getItem('autocheck_analyse')
@@ -97,12 +108,34 @@ export default function VisitePage() {
   }
 
   function handleNext() {
+    // After last niveau 1 step → show transition screen
+    if (currentIdx === lastNiveau1Idx && niveau2Steps.length > 0) {
+      setPhase('transition')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+    // After last step overall → recap
     if (currentIdx >= stepStates.length - 1) {
       setPhase('recap')
-    } else {
-      setCurrentIdx(prev => prev + 1)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
     }
+    setCurrentIdx(prev => prev + 1)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function handleTransitionContinue() {
+    // Advance to first niveau 2 step
+    const firstNiveau2Idx = stepStates.findIndex(s => s.niveau === 2)
+    if (firstNiveau2Idx !== -1) {
+      setCurrentIdx(firstNiveau2Idx)
+    }
+    setPhase('step')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function handleTransitionEnd() {
+    // Save only completed steps, skip to decision
+    saveAndGoToDecision()
   }
 
   function handleRestart() {
@@ -128,6 +161,8 @@ export default function VisitePage() {
   }
 
   if (!analyse) return null
+
+  const vehiculeKey = `${analyse.vehicule.marque} ${analyse.vehicule.modele} ${analyse.vehicule.motorisation}`
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -198,7 +233,8 @@ export default function VisitePage() {
             annee={analyse.vehicule.annee}
             motorisation={analyse.vehicule.motorisation}
             km={analyse.vehicule.kilometrage}
-            stepCount={stepStates.length}
+            niveau1Count={niveau1Steps.length}
+            niveau2Count={niveau2Steps.length}
             onStart={() => { setCurrentIdx(0); setPhase('step') }}
           />
         )}
@@ -210,13 +246,26 @@ export default function VisitePage() {
             stepNumber={currentIdx + 1}
             totalSteps={stepStates.length}
             isLast={currentIdx === stepStates.length - 1}
-            vehiculeKey={`${analyse.vehicule.marque} ${analyse.vehicule.modele} ${analyse.vehicule.motorisation}`}
+            isLastNiveau1={currentIdx === lastNiveau1Idx && niveau2Steps.length > 0}
+            vehiculeKey={vehiculeKey}
             onOK={() => handleVerdict('ok')}
             onNOK={() => handleVerdict('nok')}
             onPasse={() => handleVerdict('passe')}
             onPhoto={base64 => updateStep(currentIdx, { photo: base64 })}
             onCommentaire={text => updateStep(currentIdx, { commentaire: text })}
             onNext={handleNext}
+          />
+        )}
+
+        {phase === 'transition' && (
+          <LevelTransition
+            niveau1Total={niveau1Steps.length}
+            ok={niveau1Steps.filter(s => s.statut === 'ok').length}
+            nok={niveau1Steps.filter(s => s.statut === 'nok').length}
+            passe={niveau1Steps.filter(s => s.statut === 'passe').length}
+            niveau2Count={niveau2Steps.length}
+            onContinue={handleTransitionContinue}
+            onEnd={handleTransitionEnd}
           />
         )}
 
