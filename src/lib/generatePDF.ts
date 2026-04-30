@@ -1,17 +1,19 @@
 import { jsPDF } from 'jspdf'
 import type { AnalyseResult, ContactVerdict, VisiteData, DecisionFinale } from '@/types'
 
-// Remove emojis and non-Latin-1 chars (jsPDF standard fonts are latin-1 only)
+// Keep latin-1 printable + euro sign (U+20AC supported by jsPDF WinAnsi encoding)
+// Strip emojis and other non-renderable chars
 function clean(text: string): string {
   return text
-    .replace(/[   ​]/g, ' ')
-    .replace(/[^\x20-\xFF\n]/g, '')
-    .replace(/\s{2,}/g, ' ')
+    .replace(/ | | |​|⁠/g, ' ')
+    .replace(/[^\x20-\xFF€\n]/g, '')
+    .replace(/ {2,}/g, ' ')
     .trim()
 }
 
+// Format number, replace all flavours of thin/non-breaking space with regular space
 function fmt(n: number): string {
-  return n.toLocaleString('fr-FR').replace(/[   ]/g, ' ')
+  return n.toLocaleString('fr-FR').replace(/ | | /g, ' ')
 }
 
 export function generatePDF({
@@ -26,7 +28,8 @@ export function generatePDF({
   decision?: DecisionFinale
 }) {
   const { vehicule, score, reputation, depenses, detection } = analyse
-  const sym = clean(detection.symbole)
+  // Preserve the symbol as-is (€, £, $, CHF…) without running through clean()
+  const sym = detection.symbole.replace(/ | | /g, '').trim()
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const ML = 20
@@ -94,7 +97,7 @@ export function generatePDF({
   doc.text('AutoCheck', ML, 13)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
-  doc.text('Rapport d\'inspection vehicule d\'occasion', ML, 20)
+  doc.text("Rapport d'inspection vehicule d'occasion", ML, 20)
   const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
   doc.text(today, PW - MR, 20, { align: 'right' })
   doc.setTextColor(0, 0, 0)
@@ -109,11 +112,10 @@ export function generatePDF({
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(100, 116, 139)
-  doc.text(
-    `${fmt(vehicule.kilometrage)} km  |  ${fmt(vehicule.prix)} ${sym}  |  ${vehicule.nombreProprietaires} proprietaire(s)  |  ${clean(vehicule.version || vehicule.motorisation)}`,
-    ML, y
-  )
-  y += 4
+  const infoLine = `${fmt(vehicule.kilometrage)} km  |  ${fmt(vehicule.prix)} ${sym}  |  ${vehicule.nombreProprietaires} proprietaire(s)  |  ${clean(vehicule.version || vehicule.motorisation)}`
+  const infoLines = doc.splitTextToSize(infoLine, CW)
+  doc.text(infoLines, ML, y)
+  y += infoLines.length * 4.5 + 2
   doc.setDrawColor(226, 232, 240)
   doc.line(ML, y, PW - MR, y)
   y += 8
@@ -127,6 +129,18 @@ export function generatePDF({
     : score.total >= 45 ? [234, 88, 12]
     : [220, 38, 38]
 
+  // Pre-compute text columns to know total block height
+  const rightColW = CW - 35
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10)
+  const verdictLines = doc.splitTextToSize(clean(score.verdict), rightColW)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  const ressentLines = doc.splitTextToSize(clean(score.ressentGlobal), rightColW)
+  const textBlockH = verdictLines.length * 5 + 2 + ressentLines.length * 4.5
+  newPageIfNeeded(Math.max(16, textBlockH) + 4)
+
+  // Left: big score number
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(32)
   doc.setTextColor(sr, sg, sb)
@@ -135,21 +149,24 @@ export function generatePDF({
   doc.setFontSize(12)
   doc.setTextColor(100, 116, 139)
   doc.text('/100', ML + 18, y + 10)
+
+  // Right: verdict (bold) then ressent (normal) — both wrapped
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
   doc.setTextColor(30, 41, 59)
-  doc.text(clean(score.verdict), ML + 35, y + 4)
+  doc.text(verdictLines, ML + 35, y + 4)
+  const ressentY = y + 4 + verdictLines.length * 5 + 2
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(71, 85, 105)
-  const ressentLines = doc.splitTextToSize(clean(score.ressentGlobal), CW - 35)
-  doc.text(ressentLines, ML + 35, y + 9)
-  y += Math.max(16, ressentLines.length * 4.5 + 4)
+  doc.text(ressentLines, ML + 35, ressentY)
+
+  y += Math.max(16, textBlockH) + 2
   doc.setTextColor(0, 0, 0)
 
   if (score.pointsAttention.length > 0) {
     gap(2)
-    subHeader('Points d\'attention')
+    subHeader("Points d'attention")
     score.pointsAttention.forEach(p => bullet(p, 180, 83, 9))
   }
   gap()
@@ -188,16 +205,21 @@ export function generatePDF({
   // ── DEPENSES ────────────────────────────────────────────────────────────────
   sectionHeader('Depenses a prevoir')
 
+  // Reserve right column width for price (e.g. "4 160 €" = ~18mm at 9pt)
+  const PRICE_COL = 40
+
   depenses.items.forEach(item => {
-    newPageIfNeeded(12)
+    const priceText = `${fmt(item.montantMin)} - ${fmt(item.montantMax)} ${sym}`
+    const posteLines = doc.splitTextToSize(clean(item.poste), CW - PRICE_COL)
+    newPageIfNeeded(posteLines.length * 5 + (item.detail ? 8 : 0) + 3)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(9)
     doc.setTextColor(30, 41, 59)
-    doc.text(clean(item.poste), ML, y)
+    doc.text(posteLines, ML, y)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(100, 116, 139)
-    doc.text(`${fmt(item.montantMin)} - ${fmt(item.montantMax)} ${sym}`, PW - MR, y, { align: 'right' })
-    y += 5
+    doc.text(priceText, PW - MR, y, { align: 'right' })
+    y += posteLines.length * 5
     if (item.detail) {
       doc.setFontSize(8)
       const dl = doc.splitTextToSize(clean(item.detail), CW - 6)
@@ -308,11 +330,13 @@ export function generatePDF({
     doc.setTextColor(0, 0, 0)
     y += 15
 
+    // Title — wrapped
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(10)
     doc.setTextColor(15, 23, 42)
-    doc.text(clean(decision.titre), ML, y)
-    y += 6
+    const titreLines = doc.splitTextToSize(clean(decision.titre), CW)
+    doc.text(titreLines, ML, y)
+    y += titreLines.length * 5 + 1
     doc.setTextColor(0, 0, 0)
     bodyText(decision.resume)
     gap(3)
@@ -338,16 +362,20 @@ export function generatePDF({
 
     if (decision.argumentsNegociation.length > 0) {
       subHeader('Arguments de negociation')
+      // Reserve right column for price so text never overlaps
+      const ARG_PRICE_COL = 42
       decision.argumentsNegociation.forEach(a => {
-        newPageIfNeeded(7)
         doc.setFont('helvetica', 'normal')
         doc.setFontSize(9)
+        const priceText = `-${fmt(a.reduction)} ${sym}`
+        const reasonLines = doc.splitTextToSize(`- ${clean(a.raison)}`, CW - 6 - ARG_PRICE_COL)
+        newPageIfNeeded(reasonLines.length * 4.5 + 1)
         doc.setTextColor(71, 85, 105)
-        doc.text(`- ${clean(a.raison)}`, ML + 6, y)
+        doc.text(reasonLines, ML + 6, y)
         doc.setTextColor(220, 38, 38)
-        doc.text(`-${fmt(a.reduction)} ${sym}`, PW - MR, y, { align: 'right' })
+        doc.text(priceText, PW - MR, y, { align: 'right' })
         doc.setTextColor(0, 0, 0)
-        y += 5
+        y += reasonLines.length * 4.5 + 1
       })
 
       if (decision.reductionTotale > 0) {
