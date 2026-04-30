@@ -39,6 +39,7 @@ export type UILabels = {
   selon_diagnostic: string
   montants_non_inclus: string
   frais_achat: string
+  estimations_marche_local: string
   carte_grise: string
   total_certain: string
   poste: string
@@ -116,6 +117,7 @@ const LABELS: Record<string, UILabels> = {
     selon_diagnostic: 'À prévoir selon résultats diagnostic',
     montants_non_inclus: 'Montants non inclus dans le total — dépend des résultats du diagnostic.',
     frais_achat: "Frais d'achat obligatoires",
+    estimations_marche_local: "Estimations basées sur les prix du marché local",
     carte_grise: 'Carte grise & assurance',
     total_certain: 'Total certain',
     poste: 'Poste',
@@ -186,6 +188,7 @@ const LABELS: Record<string, UILabels> = {
     selon_diagnostic: 'Depending on Inspection Results',
     montants_non_inclus: 'Amounts not included in total — depends on diagnostic results.',
     frais_achat: 'Mandatory Purchase Fees',
+    estimations_marche_local: 'Estimates based on local market prices',
     carte_grise: 'Registration & Insurance',
     total_certain: 'Confirmed Total',
     poste: 'Item',
@@ -256,6 +259,7 @@ const LABELS: Record<string, UILabels> = {
     selon_diagnostic: 'Según resultados del diagnóstico',
     montants_non_inclus: 'Importes no incluidos en el total — depende de los resultados del diagnóstico.',
     frais_achat: 'Gastos obligatorios de compra',
+    estimations_marche_local: 'Estimaciones basadas en los precios del mercado local',
     carte_grise: 'Matrícula y seguro',
     total_certain: 'Total confirmado',
     poste: 'Concepto',
@@ -326,6 +330,7 @@ const LABELS: Record<string, UILabels> = {
     selon_diagnostic: 'Conforme resultados do diagnóstico',
     montants_non_inclus: 'Valores não incluídos no total — depende dos resultados do diagnóstico.',
     frais_achat: 'Custos obrigatórios de compra',
+    estimations_marche_local: 'Estimativas baseadas nos preços do mercado local',
     carte_grise: 'Registro e seguro',
     total_certain: 'Total confirmado',
     poste: 'Item',
@@ -396,6 +401,7 @@ const LABELS: Record<string, UILabels> = {
     selon_diagnostic: 'In base ai risultati della diagnosi',
     montants_non_inclus: 'Importi non inclusi nel totale — dipende dai risultati della diagnosi.',
     frais_achat: 'Spese obbligatorie di acquisto',
+    estimations_marche_local: 'Stime basate sui prezzi del mercato locale',
     carte_grise: 'Immatricolazione e assicurazione',
     total_certain: 'Totale confermato',
     poste: 'Voce',
@@ -466,6 +472,7 @@ const LABELS: Record<string, UILabels> = {
     selon_diagnostic: 'Je nach Diagnoseergebnis',
     montants_non_inclus: 'Beträge nicht im Gesamtbetrag enthalten — hängt von den Diagnoseergebnissen ab.',
     frais_achat: 'Pflichtgebühren beim Kauf',
+    estimations_marche_local: 'Schätzungen auf Basis lokaler Marktpreise',
     carte_grise: 'Zulassung & Versicherung',
     total_certain: 'Bestätigtes Gesamt',
     poste: 'Posten',

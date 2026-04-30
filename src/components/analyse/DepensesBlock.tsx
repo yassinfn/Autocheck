@@ -79,7 +79,7 @@ export default function DepensesBlock({ depenses, symbole, labels }: DepensesBlo
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-slate-100">
         <span className="text-base font-semibold text-slate-900">{L.depenses}</span>
-        <p className="text-xs text-slate-400 mt-0.5">Estimations basées sur les prix du marché local</p>
+        <p className="text-xs text-slate-400 mt-0.5">{L.estimations_marche_local}</p>
       </div>
 
       <div className="p-5 space-y-7">

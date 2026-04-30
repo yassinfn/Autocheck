@@ -147,7 +147,8 @@ export default function AnalysePage() {
             let updated: AnalysePartial = partial
             const gen = reputation?.analyse_generation
             if (gen && !gen.est_meilleure_version) {
-              const warning = `Version non optimale (${gen.generation}) — ${gen.conseil_version || gen.explication}`
+              const labels = getLabels(partial.detection.pays ?? 'France')
+              const warning = `${labels.pas_meilleure_version} (${gen.generation}) — ${gen.conseil_version || gen.explication}`
               if (!partial.score.pointsAttention.includes(warning)) {
                 updated = {
                   ...partial,
@@ -383,7 +384,7 @@ export default function AnalysePage() {
                     <span>{displayData.vehicule.prix.toLocaleString('fr-FR')} {displayData.detection.symbole}</span>
                     <span>•</span>
                     <span>
-                      {displayData.vehicule.nombreProprietaires} {L.proprietaires}
+                      {displayData.vehicule.nombreProprietaires ?? '?'} {L.proprietaires}
                     </span>
                     <span>•</span>
                     <span>{displayData.detection.pays}</span>

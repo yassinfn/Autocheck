@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { generatePDF } from '@/lib/generatePDF'
 import type { AnalyseResult, ContactVerdict, VisiteData, DecisionFinale } from '@/types'
+import { getLabels } from '@/lib/uiLabels'
 
 interface Props {
   analyse: AnalyseResult
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function BoutonTelechargement({ analyse, contact, visite, decision }: Props) {
+  const L = getLabels(analyse.detection.pays ?? 'France')
   const [generating, setGenerating] = useState(false)
 
   async function handleClick() {
@@ -41,7 +43,7 @@ export default function BoutonTelechargement({ analyse, contact, visite, decisio
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
           </svg>
-          Télécharger le rapport PDF
+          {L.telecharger_pdf}
         </>
       )}
     </button>
