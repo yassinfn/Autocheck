@@ -4,6 +4,33 @@ import { supabase } from '@/lib/supabase'
 import { ANALYSE_SYSTEM, buildAnalysePrompt, buildReputationPrompt } from '@/lib/prompts/analyse'
 import type { AnalyseResult, ReputationResult, HistoryData } from '@/types'
 
+function detectLanguageFromText(text: string): string {
+  const t = text.toLowerCase()
+  const scores: Record<string, number> = { fr: 0, en: 0, es: 0, pt: 0, it: 0, de: 0 }
+  const keywords: Record<string, string[]> = {
+    fr: ['voiture', 'kilomètre', 'kilométrage', 'boîte', 'essence', 'occasion', 'propriétaire', 'vente', 'prix', 'marque', 'modèle', 'année', 'chevaux', 'puissance', 'carrosserie'],
+    en: ['mileage', 'gearbox', 'petrol', 'used', 'owner', 'sale', 'price', 'make', 'model', 'year', 'horsepower', 'transmission', 'registration'],
+    es: ['kilómetros', 'caja', 'gasolina', 'ocasión', 'propietario', 'venta', 'precio', 'marca', 'modelo', 'año', 'caballos', 'carrocería'],
+    pt: ['quilómetros', 'caixa', 'gasolina', 'usado', 'proprietário', 'venda', 'preço', 'marca', 'modelo', 'ano', 'cavalos'],
+    it: ['chilometri', 'cambio', 'benzina', 'usato', 'proprietario', 'vendita', 'prezzo', 'marca', 'modello', 'anno', 'cavalli', 'carrozzeria'],
+    de: ['kilometerstand', 'getriebe', 'benzin', 'gebraucht', 'eigentümer', 'verkauf', 'preis', 'marke', 'modell', 'baujahr', 'karosserie'],
+  }
+  for (const [lang, words] of Object.entries(keywords)) {
+    for (const word of words) {
+      if (t.includes(word)) scores[lang]++
+    }
+  }
+  return Object.entries(scores).sort((a, b) => b[1] - a[1])[0][0]
+}
+
+function langToCountry(lang: string): string {
+  const map: Record<string, string> = {
+    fr: 'France', en: 'United Kingdom', es: 'Spain',
+    pt: 'Portugal', it: 'Italy', de: 'Germany', nl: 'Netherlands',
+  }
+  return map[lang] ?? 'France'
+}
+
 type WithoutReputation = Omit<AnalyseResult, 'reputation'>
 
 function buildCacheKey(data: WithoutReputation): string {
@@ -81,8 +108,11 @@ export async function POST(req: NextRequest) {
           analyseData = extractJSON<WithoutReputation>(text)
           annonceText = `${analyseData.vehicule.marque} ${analyseData.vehicule.modele} ${analyseData.vehicule.version} ${analyseData.vehicule.annee} ${analyseData.vehicule.motorisation} ${analyseData.vehicule.boite} (${analyseData.detection.pays})`
         } else {
+          const detectedLang = detectLanguageFromText(annonce!)
+          const detectedCountry = langToCountry(detectedLang)
+          const textWithHint = `[HINT: This listing appears to be from ${detectedCountry}. Respond entirely in the language of that country.]\n\n${annonce!}`
           const text = await callClaude(
-            buildAnalysePrompt(annonce!, historyData),
+            buildAnalysePrompt(textWithHint, historyData),
             ANALYSE_SYSTEM,
             4000
           )

@@ -205,6 +205,10 @@ export default function AnnonceInput({ onSubmit, onCacheHit, onStart, disabled, 
 
   function handleFallbackSubmit() {
     if (!fallbackTexte.trim() || disabled) return
+    if (inputMode === 'text') {
+      onStart?.()
+      localStorage.removeItem('autocheck_source_url')
+    }
     onSubmit(fallbackTexte.trim())
   }
 
