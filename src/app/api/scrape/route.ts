@@ -263,6 +263,51 @@ async function fetchAutoviza(
   }
 }
 
+// ── CarGurus internal API ─────────────────────────────────────────────────────
+
+function extractCarGurusListingId(url: string): string | null {
+  const fragmentMatch = url.match(/[#&]listing=(\d+)/)
+  if (fragmentMatch) return fragmentMatch[1]
+  const paramMatch = url.match(/listingId=(\d+)/)
+  if (paramMatch) return paramMatch[1]
+  return null
+}
+
+async function fetchCarGurusListing(listingId: string, domain: string): Promise<string | null> {
+  const base = domain.includes('.ca') ? 'https://www.cargurus.ca' : 'https://www.cargurus.com'
+  const referer = `${base}/Cars/vehicleDetails_html?listingId=${listingId}`
+
+  const endpoints = [
+    `${base}/Cars/ajax/getVdpDetails.action?listingId=${listingId}`,
+    `${base}/Cars/ajax/getListing.action?listingId=${listingId}`,
+    `${base}/api/v1/listings/${listingId}`,
+  ]
+
+  for (const endpoint of endpoints) {
+    try {
+      const res = await fetch(endpoint, {
+        headers: {
+          'User-Agent': DESKTOP_UA,
+          Accept: 'application/json, text/plain, */*',
+          'Accept-Language': 'en-CA,en;q=0.9,fr;q=0.8',
+          Referer: referer,
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        signal: AbortSignal.timeout(10_000),
+      })
+      console.log('[CarGurus API]', endpoint, '→', res.status)
+      if (!res.ok) continue
+      const data = await res.json()
+      const text = JSON.stringify(data, null, 2)
+      console.log('[CarGurus API] ok, length:', text.length)
+      return text
+    } catch (e) {
+      console.log('[CarGurus API] échec:', endpoint, e)
+    }
+  }
+  return null
+}
+
 // ── Main handler ─────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -310,6 +355,29 @@ export async function POST(req: NextRequest) {
         historySource: 'autoviza',
         historyData: result.data,
       })
+    }
+
+    // ── CarGurus: internal API (faster + more reliable than Browserless) ────
+    if (hostname.includes('cargurus.com') || hostname.includes('cargurus.ca')) {
+      const listingId = extractCarGurusListingId(url)
+      console.log('[CarGurus] URL:', url)
+      console.log('[CarGurus] listingId:', listingId)
+
+      if (listingId) {
+        const apiText = await fetchCarGurusListing(listingId, hostname)
+        console.log('[CarGurus] API response length:', apiText?.length ?? 0)
+        if (apiText) {
+          return NextResponse.json({ text: apiText.slice(0, 8000), hasHistory: false })
+        }
+      }
+
+      return NextResponse.json(
+        {
+          error: 'blocked',
+          message: "CarGurus ne permet pas l'accès automatique. Ouvrez l'annonce, appuyez sur Ctrl+A puis Ctrl+C et collez le texte ici.",
+        },
+        { status: 403 }
+      )
     }
 
     // ── Route by site config ────────────────────────────────────────────────
