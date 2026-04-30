@@ -8,6 +8,7 @@ import ScenarioIntro from '@/components/visite/ScenarioIntro'
 import ScenarioStep from '@/components/visite/ScenarioStep'
 import ScenarioRecap from '@/components/visite/ScenarioRecap'
 import LevelTransition from '@/components/visite/LevelTransition'
+import DownloadPDFButton from '@/components/ui/DownloadPDFButton'
 import type {
   AnalyseResult,
   ScenarioResult,
@@ -179,6 +180,7 @@ export default function VisitePage() {
             <a href="/historique" className="text-xs text-slate-500 hover:text-slate-700 shrink-0">
               Historique
             </a>
+            {(phase === 'recap' || phase === 'transition') && <DownloadPDFButton />}
             <StepNav current={3} navigate={href => { window.location.href = href }} />
           </div>
         </div>

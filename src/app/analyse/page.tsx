@@ -8,6 +8,7 @@ import DepensesBlock from '@/components/analyse/DepensesBlock'
 import HistoryBlock from '@/components/analyse/HistoryBlock'
 import Spinner from '@/components/ui/Spinner'
 import StepNav from '@/components/ui/StepNav'
+import DownloadPDFButton from '@/components/ui/DownloadPDFButton'
 import { supabase } from '@/lib/supabase'
 import type { AnalyseResult, HistoryData, ContactVerdict, VisiteData, DecisionFinale } from '@/types'
 import { getOrCreateSessionId, saveAnalysis, clearRowId, restoreRowId } from '@/lib/saveAnalysis'
@@ -263,6 +264,7 @@ export default function AnalysePage() {
           <span className="font-bold text-slate-900">AutoCheck</span>
           <div className="ml-auto flex items-center gap-3">
             <a href="/historique" className="text-xs text-slate-500 hover:text-slate-700 shrink-0">Historique</a>
+            {step === 'results' && result && <DownloadPDFButton />}
             <StepNav current={1} navigate={(href) => { window.location.href = href }} />
           </div>
         </div>

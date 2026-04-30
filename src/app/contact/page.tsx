@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Spinner from '@/components/ui/Spinner'
 import StepNav from '@/components/ui/StepNav'
+import DownloadPDFButton from '@/components/ui/DownloadPDFButton'
 import ConfirmLeave from '@/components/ui/ConfirmLeave'
 import QuestionsBlock from '@/components/contact/QuestionsBlock'
 import ReponsesForm, { type UploadedFile } from '@/components/contact/ReponsesForm'
@@ -160,6 +161,7 @@ export default function ContactPage() {
           <span className="font-bold text-slate-900">AutoCheck</span>
           <div className="ml-auto flex items-center gap-3">
             <a href="/historique" className="text-xs text-slate-500 hover:text-slate-700 shrink-0">Historique</a>
+            {step === 'verdict' && <DownloadPDFButton />}
             <StepNav current={2} navigate={navigate} />
           </div>
         </div>
