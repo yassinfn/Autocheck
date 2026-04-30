@@ -13,6 +13,7 @@ import BoutonTelechargement from '@/components/pdf/BoutonTelechargement'
 import { supabase } from '@/lib/supabase'
 import type { AnalyseResult, HistoryData, ContactVerdict, VisiteData, DecisionFinale } from '@/types'
 import { getOrCreateSessionId, saveAnalysis, clearRowId, restoreRowId } from '@/lib/saveAnalysis'
+import { getLocaleFromCountry, createT } from '@/lib/i18n'
 
 interface CachedRow {
   id: string
@@ -254,6 +255,8 @@ export default function AnalysePage() {
   }
 
   const displayData = (result ?? streamPartial) as AnalyseResult | null
+  const locale = displayData ? getLocaleFromCountry(displayData.detection.pays) : 'fr'
+  const t = createT(locale)
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -381,9 +384,7 @@ export default function AnalysePage() {
                     <span>{displayData.vehicule.prix.toLocaleString('fr-FR')} {displayData.detection.symbole}</span>
                     <span>•</span>
                     <span>
-                      {displayData.vehicule.nombreProprietaires === 1
-                        ? '1 propriétaire'
-                        : `${displayData.vehicule.nombreProprietaires} propriétaires`}
+                      {displayData.vehicule.nombreProprietaires} {t('analyse.proprietaires')}
                     </span>
                     <span>•</span>
                     <span>{displayData.detection.pays}</span>
@@ -394,14 +395,14 @@ export default function AnalysePage() {
                     onClick={handleModify}
                     className="shrink-0 text-xs px-3 py-1.5 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
                   >
-                    Modifier / Relancer
+                    {t('analyse.modifier_relancer')}
                   </button>
                 )}
               </div>
             </div>
 
-            <ScoreBlock score={displayData.score} />
-            {historyData && <HistoryBlock history={historyData} detection={displayData.detection} />}
+            <ScoreBlock score={displayData.score} locale={locale} />
+            {historyData && <HistoryBlock history={historyData} detection={displayData.detection} locale={locale} />}
 
             {/* Réputation : skeleton pendant le chargement, données réelles quand prêtes */}
             {reputationLoading && (
@@ -419,14 +420,14 @@ export default function AnalysePage() {
                 </div>
               </div>
             )}
-            {result && <ReputationBlock reputation={result.reputation} detection={result.detection} />}
+            {result && <ReputationBlock reputation={result.reputation} detection={result.detection} locale={locale} />}
 
-            <DepensesBlock depenses={displayData.depenses} symbole={displayData.detection.symbole} />
+            <DepensesBlock depenses={displayData.depenses} symbole={displayData.detection.symbole} locale={locale} />
 
             {/* CTA */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 text-center">
               <h3 className="text-lg font-semibold text-slate-900">
-                Êtes-vous toujours intéressé par cette annonce ?
+                {t('analyse.toujours_interesse')}
               </h3>
               <p className="text-slate-500 text-sm mt-1 mb-5">
                 Score {displayData.score.total}/100 — {displayData.score.verdict}
@@ -438,7 +439,7 @@ export default function AnalysePage() {
                     onClick={resetAnalyse}
                     className="px-6 py-3 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200 transition-colors"
                   >
-                    ↺ Nouvelle analyse
+                    ↺ {t('analyse.nouvelle_analyse')}
                   </button>
                   {reputationLoading ? (
                     <div className="px-6 py-3 bg-indigo-400 text-white rounded-lg font-medium text-center flex items-center justify-center gap-2 cursor-wait">
@@ -450,7 +451,7 @@ export default function AnalysePage() {
                       href="/contact"
                       className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors text-center"
                     >
-                      Continuer → Vendeur
+                      {t('analyse.continuer_vendeur')}
                     </a>
                   )}
                 </div>

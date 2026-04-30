@@ -1,16 +1,21 @@
+import { createT } from '@/lib/i18n'
+import { getLocaleFromCountry } from '@/lib/i18n'
 import type { HistoryData, DetectionResult } from '@/types'
 
 interface HistoryBlockProps {
   history: HistoryData
   detection: DetectionResult
+  locale?: string
 }
 
-export default function HistoryBlock({ history, detection }: HistoryBlockProps) {
+export default function HistoryBlock({ history, detection, locale }: HistoryBlockProps) {
+  const t = createT(locale ?? getLocaleFromCountry(detection.pays))
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
         <div className="flex items-center gap-2 flex-1">
-          <span className="text-base font-semibold text-slate-900">Rapport d&apos;historique</span>
+          <span className="text-base font-semibold text-slate-900">{t('analyse.historique_vehicule')}</span>
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-medium">
             ✓ Autoviza vérifié
           </span>
@@ -18,27 +23,24 @@ export default function HistoryBlock({ history, detection }: HistoryBlockProps) 
       </div>
 
       <div className="p-5 space-y-4">
-        {/* Key indicators */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-slate-50 rounded-lg p-3 text-center">
             <div className="text-2xl font-bold text-slate-900">
               {history.proprietaires ?? '?'}
             </div>
             <div className="text-xs text-slate-500 mt-0.5">
-              {history.proprietaires === 1 ? 'propriétaire' : 'propriétaires'}
+              {t('analyse.proprietaires')}
             </div>
           </div>
 
           <div className="bg-slate-50 rounded-lg p-3 text-center">
             <div className="text-2xl font-bold text-slate-900">{history.relevesKm.length}</div>
-            <div className="text-xs text-slate-500 mt-0.5">relevé(s) km</div>
+            <div className="text-xs text-slate-500 mt-0.5">{t('analyse.releve_km')}</div>
           </div>
 
           <div
             className={`rounded-lg p-3 text-center ${
-              history.immatriculationVerifiee
-                ? 'bg-green-50'
-                : 'bg-slate-50'
+              history.immatriculationVerifiee ? 'bg-green-50' : 'bg-slate-50'
             }`}
           >
             <div className={`text-lg font-bold ${history.immatriculationVerifiee ? 'text-green-600' : 'text-slate-400'}`}>
@@ -56,23 +58,22 @@ export default function HistoryBlock({ history, detection }: HistoryBlockProps) 
               {history.coherenceKm ? '✓' : '⚠'}
             </div>
             <div className={`text-xs mt-0.5 ${history.coherenceKm ? 'text-slate-500' : 'text-red-600 font-medium'}`}>
-              {history.coherenceKm ? 'Km cohérents' : 'Km suspect'}
+              {history.coherenceKm ? t('analyse.km_coherents') : t('analyse.km_suspect')}
             </div>
           </div>
         </div>
 
-        {/* Km readings timeline */}
         {history.relevesKm.length > 0 && (
           <div>
             <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-2">
-              Historique kilométrique
+              {t('analyse.historique_vehicule')}
             </p>
             <div className="space-y-1.5">
               {history.relevesKm.map((r, i) => (
                 <div key={i} className="flex items-center gap-3">
                   <div className="w-2 h-2 rounded-full bg-indigo-400 shrink-0" />
                   <span className="text-sm font-medium text-slate-800">
-                    {r.km.toLocaleString('fr-FR')} km
+                    {r.km.toLocaleString()} km
                   </span>
                   <span className="text-xs text-slate-400">{r.date}</span>
                   {r.source && (
@@ -84,11 +85,10 @@ export default function HistoryBlock({ history, detection }: HistoryBlockProps) 
           </div>
         )}
 
-        {/* Coherence alert */}
         {!history.coherenceKm && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-            <span className="font-medium">Anomalie kilométrique détectée</span> — le compteur
-            pourrait avoir été manipulé. Exigez une explication avant tout achat.
+            <span className="font-medium">{t('analyse.anomalie_km')}</span>{' '}
+            — {t('analyse.anomalie_km_detail')}
           </div>
         )}
       </div>

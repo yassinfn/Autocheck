@@ -1,22 +1,26 @@
+import { createT } from '@/lib/i18n'
 import type { DepenseItem, DepensesResult } from '@/types'
 
 interface DepensesBlockProps {
   depenses: DepensesResult
   symbole: string
+  locale?: string
 }
 
 function fmt(n: number, symbole: string): string {
-  return `${n.toLocaleString('fr-FR')} ${symbole}`
+  return `${n.toLocaleString()} ${symbole}`
 }
 
 function ItemTable({
   items,
   symbole,
   footer,
+  t,
 }: {
   items: DepenseItem[]
   symbole: string
   footer?: { label: string; min: number; max: number }
+  t: (key: string) => string
 }) {
   if (items.length === 0) return null
   return (
@@ -24,9 +28,9 @@ function ItemTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-slate-200">
-            <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500 uppercase tracking-wide">Poste</th>
-            <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden sm:table-cell">Détail</th>
-            <th className="text-right py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Fourchette</th>
+            <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500 uppercase tracking-wide">{t('analyse.poste')}</th>
+            <th className="text-left py-2 pr-4 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden sm:table-cell">{t('analyse.detail')}</th>
+            <th className="text-right py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">{t('analyse.fourchette')}</th>
           </tr>
         </thead>
         <tbody>
@@ -63,7 +67,8 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
-export default function DepensesBlock({ depenses, symbole }: DepensesBlockProps) {
+export default function DepensesBlock({ depenses, symbole, locale = 'fr' }: DepensesBlockProps) {
+  const t = createT(locale)
   const obligatoires = depenses.obligatoires ?? []
   const eventuelles = depenses.eventuelles ?? []
   const fraisAchat = depenses.fraisAchat ?? []
@@ -73,44 +78,39 @@ export default function DepensesBlock({ depenses, symbole }: DepensesBlockProps)
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-slate-100">
-        <span className="text-base font-semibold text-slate-900">Dépenses à prévoir</span>
+        <span className="text-base font-semibold text-slate-900">{t('analyse.depenses_prevoir')}</span>
         <p className="text-xs text-slate-400 mt-0.5">Estimations basées sur les prix du marché local</p>
       </div>
 
       <div className="p-5 space-y-7">
 
-        {/* ── Bloc 1 : Mécaniques ── */}
         <div>
-          <h3 className="text-sm font-semibold text-slate-700 mb-4">Dépenses mécaniques</h3>
+          <h3 className="text-sm font-semibold text-slate-700 mb-4">{t('analyse.depenses_mecaniques')}</h3>
 
-          {/* 1a — Obligatoires */}
           <div className="mb-5">
-            <SectionLabel>À faire obligatoirement à l&apos;achat</SectionLabel>
+            <SectionLabel>{t('analyse.a_faire_obligatoirement')}</SectionLabel>
             <ItemTable
               items={obligatoires}
               symbole={symbole}
-              footer={{ label: 'Total certain', min: totalMin, max: totalMax }}
+              footer={{ label: t('analyse.total_certain'), min: totalMin, max: totalMax }}
+              t={t}
             />
           </div>
 
-          {/* 1b — Éventuelles */}
           {eventuelles.length > 0 && (
             <div>
-              <SectionLabel>À prévoir selon résultats diagnostic</SectionLabel>
-              <p className="text-xs text-slate-400 mb-3">
-                Montants non inclus dans le total — dépend des résultats du diagnostic.
-              </p>
-              <ItemTable items={eventuelles} symbole={symbole} />
+              <SectionLabel>{t('analyse.a_prevoir_selon_diagnostic')}</SectionLabel>
+              <p className="text-xs text-slate-400 mb-3">{t('analyse.montants_non_inclus')}</p>
+              <ItemTable items={eventuelles} symbole={symbole} t={t} />
             </div>
           )}
         </div>
 
-        {/* ── Bloc 2 : Frais d'achat ── */}
         {fraisAchat.length > 0 && (
           <div className="pt-5 border-t border-slate-200">
-            <h3 className="text-sm font-semibold text-slate-700 mb-4">Frais d&apos;achat obligatoires</h3>
-            <SectionLabel>Carte grise &amp; assurance</SectionLabel>
-            <ItemTable items={fraisAchat} symbole={symbole} />
+            <h3 className="text-sm font-semibold text-slate-700 mb-4">{t('analyse.frais_achat')}</h3>
+            <SectionLabel>{t('analyse.carte_grise_assurance')}</SectionLabel>
+            <ItemTable items={fraisAchat} symbole={symbole} t={t} />
           </div>
         )}
 

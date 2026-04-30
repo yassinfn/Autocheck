@@ -2,10 +2,12 @@
 
 import { useState } from 'react'
 import ScoreGauge from '@/components/ui/ScoreGauge'
+import { createT } from '@/lib/i18n'
 import type { ScoreResult, VerdictType } from '@/types'
 
 interface ScoreBlockProps {
   score: ScoreResult
+  locale?: string
 }
 
 const VERDICT_CONFIG: Record<VerdictType, { bg: string; text: string; icon: string }> = {
@@ -15,18 +17,17 @@ const VERDICT_CONFIG: Record<VerdictType, { bg: string; text: string; icon: stri
   avoid:     { bg: 'bg-red-50 border-red-200', text: 'text-red-700', icon: '🚫' },
 }
 
-export default function ScoreBlock({ score }: ScoreBlockProps) {
+export default function ScoreBlock({ score, locale = 'fr' }: ScoreBlockProps) {
   const [showDetails, setShowDetails] = useState(false)
   const config = VERDICT_CONFIG[score.verdictType] ?? VERDICT_CONFIG.good
+  const t = createT(locale)
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      {/* Header */}
       <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
-        <span className="text-base font-semibold text-slate-900">Score de l&apos;annonce</span>
+        <span className="text-base font-semibold text-slate-900">{t('analyse.score_annonce')}</span>
       </div>
 
-      {/* Score + verdict */}
       <div className="p-5 flex flex-col sm:flex-row items-center gap-6">
         <div className="shrink-0">
           <ScoreGauge score={score.total} size={140} />
@@ -53,14 +54,13 @@ export default function ScoreBlock({ score }: ScoreBlockProps) {
         </div>
       </div>
 
-      {/* Toggle details */}
       <div className="px-5 pb-4">
         <button
           onClick={() => setShowDetails((v) => !v)}
           className="text-sm text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
         >
           <span>{showDetails ? '▲' : '▼'}</span>
-          {showDetails ? 'Masquer le détail' : 'Voir le détail des critères'}
+          {showDetails ? t('analyse.masquer_detail') : t('analyse.voir_detail')}
         </button>
 
         {showDetails && (
@@ -75,7 +75,6 @@ export default function ScoreBlock({ score }: ScoreBlockProps) {
                   <p className="text-sm font-medium text-slate-800">{d.critere}</p>
                   <p className="text-xs text-slate-500 mt-0.5">{d.commentaire}</p>
                 </div>
-                {/* Progress bar */}
                 <div className="shrink-0 w-16 flex items-center mt-1">
                   <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
                     <div
