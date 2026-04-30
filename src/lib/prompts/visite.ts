@@ -87,6 +87,8 @@ RÈGLES:
 6. photo_requise true pour: au moins 1 étape Extérieur, au moins 1 Compartiment moteur, toutes Dessous du véhicule, Points spécifiques à risque élevé
 7. Tous les textes en ${detection.langue}
 8. IDs au format: ext-1, ext-2, mot-1, hab-1, des-1, dem-1, spe-1, etc.
+9. image_query: requête Google Images en anglais pour illustrer CE qu'il faut inspecter sur CE modèle (ex: "Citroën C4 Picasso 1.6 HDi timing belt inspection"). Chaîne vide "" pour étapes comportementales (essai routier).
+10. youtube_query: requête YouTube en ${detection.langue} pour trouver une vidéo explicative (ex: "vérifier courroie distribution C4 Picasso 1.6 HDi"). Chaîne vide "" pour étapes comportementales.
 
 Réponds UNIQUEMENT avec ce JSON valide:
 {
@@ -103,7 +105,9 @@ Réponds UNIQUEMENT avec ce JSON valide:
       ],
       "photo_requise": true,
       "commentaire_possible": true,
-      "si_nok": "Une différence de teinte entre panneaux indique une réparation après accident. Demandez l'historique des sinistres et négociez 500 à 1 500 € selon l'étendue des réparations. Si impact majeur non déclaré, abandonnez."
+      "si_nok": "Une différence de teinte entre panneaux indique une réparation après accident. Demandez l'historique des sinistres et négociez 500 à 1 500 € selon l'étendue des réparations. Si impact majeur non déclaré, abandonnez.",
+      "image_query": "used car body panel paint difference inspection",
+      "youtube_query": "inspecter carrosserie voiture occasion"
     }
   ]
 }`

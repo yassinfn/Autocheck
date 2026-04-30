@@ -135,6 +135,8 @@ export interface VisiteStep {
   photo_requise: boolean
   commentaire_possible: boolean
   si_nok: string
+  image_query?: string
+  youtube_query?: string
 }
 
 export interface VisiteStepState extends VisiteStep {

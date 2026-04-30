@@ -210,6 +210,7 @@ export default function VisitePage() {
             stepNumber={currentIdx + 1}
             totalSteps={stepStates.length}
             isLast={currentIdx === stepStates.length - 1}
+            vehiculeKey={`${analyse.vehicule.marque} ${analyse.vehicule.modele} ${analyse.vehicule.motorisation}`}
             onOK={() => handleVerdict('ok')}
             onNOK={() => handleVerdict('nok')}
             onPasse={() => handleVerdict('passe')}

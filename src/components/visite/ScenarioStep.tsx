@@ -1,13 +1,15 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import type { VisiteStepState } from '@/types'
+import StepExempleModal from './StepExempleModal'
 
 interface ScenarioStepProps {
   step: VisiteStepState
   stepNumber: number
   totalSteps: number
   isLast: boolean
+  vehiculeKey: string
   onOK: () => void
   onNOK: () => void
   onPasse: () => void
@@ -50,12 +52,14 @@ async function compressImage(file: File): Promise<string> {
 }
 
 export default function ScenarioStep({
-  step, stepNumber, totalSteps, isLast,
+  step, stepNumber, totalSteps, isLast, vehiculeKey,
   onOK, onNOK, onPasse, onPhoto, onCommentaire, onNext,
 }: ScenarioStepProps) {
   const fileRef = useRef<HTMLInputElement>(null)
+  const [showModal, setShowModal] = useState(false)
   const verdictGiven = step.statut !== 'pending'
   const catColor = CAT_COLORS[step.categorie] ?? 'bg-slate-100 text-slate-600'
+  const hasExemple = Boolean(step.image_query || step.youtube_query)
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -91,8 +95,18 @@ export default function ScenarioStep({
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-5 space-y-4">
 
-          {/* Title */}
-          <h2 className="text-xl font-bold text-slate-900 leading-snug">{step.titre}</h2>
+          {/* Title + exemple button */}
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="text-xl font-bold text-slate-900 leading-snug">{step.titre}</h2>
+            {hasExemple && (
+              <button
+                onClick={() => setShowModal(true)}
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-100 transition-colors"
+              >
+                📷 Exemple
+              </button>
+            )}
+          </div>
 
           {/* Instruction */}
           <p className="text-sm text-slate-600 leading-relaxed">{step.instruction}</p>
@@ -230,6 +244,18 @@ export default function ScenarioStep({
           )}
         </div>
       </div>
+
+      {/* Exemple modal */}
+      {showModal && (
+        <StepExempleModal
+          vehiculeKey={vehiculeKey}
+          etapeId={step.id}
+          imageQuery={step.image_query ?? ''}
+          youtubeQuery={step.youtube_query ?? ''}
+          titre={step.titre}
+          onClose={() => setShowModal(false)}
+        />
+      )}
     </div>
   )
 }
