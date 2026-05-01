@@ -53,6 +53,7 @@
   ],
   "permissions": ["activeTab", "scripting"],
   "host_permissions": [
+    "https://autocheck-green.vercel.app/*",
     "*://*.leboncoin.fr/*",
     "*://*.lacentrale.fr/*",
     "*://*.autoscout24.*/*",

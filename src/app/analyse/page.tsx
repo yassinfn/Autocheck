@@ -82,12 +82,28 @@ export default function AnalysePage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const id = params.get('id')
+    const token = params.get('token')
     const urlParam = params.get('url')
     const textParam = params.get('text')
 
     if (id) {
       loadAnalysisById(id)
+    } else if (token) {
+      // Token-based flow: content stored server-side to avoid URL length limits
+      fetch(`/api/bookmarklet-store?token=${token}`)
+        .then(r => r.json())
+        .then((data: { url?: string; text?: string; error?: string }) => {
+          if (data.error || !data.text) return
+          if (data.url) {
+            localStorage.setItem('autocheck_source_url', data.url)
+            setBookmarkletSource(data.url)
+          }
+          setBookmarkletText(data.text)
+          handleSubmit(data.text)
+        })
+        .catch(() => {})
     } else if (textParam) {
+      // Legacy URL-params flow (bookmarklet on older installs)
       const decodedText = decodeURIComponent(textParam)
       if (urlParam) {
         const decodedUrl = decodeURIComponent(urlParam)

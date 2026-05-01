@@ -22,7 +22,7 @@ const SUPPORTED_SITES = {
   'standvirtual.com': 'StandVirtual',
   'kijiji.ca': 'Kijiji',
   'paruvendu.fr': 'ParuVendu',
-  'largus.fr': 'L\'Argus',
+  'largus.fr': "L'Argus",
   'facebook.com': 'Facebook Marketplace',
   'olx.com': 'OLX',
   'avito.ma': 'Avito',
@@ -74,21 +74,24 @@ document.addEventListener('DOMContentLoaded', async () => {
       })
 
       if (response && response.text) {
-        const url = encodeURIComponent(response.url)
-        const text = encodeURIComponent(response.text)
-        const base = `${AUTOCHECK_URL}/analyse?`
-        const full = `${base}url=${url}&text=${text}`
-        const analyseUrl = full.length > 8000 ? `${base}text=${text}` : full
-        chrome.tabs.create({ url: analyseUrl })
+        // POST content to server, get a short token back — avoids URL length limits
+        const res = await fetch(`${AUTOCHECK_URL}/api/bookmarklet-store`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: response.url, text: response.text }),
+        })
+        const { token } = await res.json()
+        chrome.tabs.create({ url: `${AUTOCHECK_URL}/analyse?token=${token}` })
         window.close()
-      } else {
-        throw new Error('Impossible de récupérer le contenu')
+        return
       }
     } catch {
-      // Fallback : ouvrir avec l'URL seule (content script non injecté ou page non supportée)
-      const url = encodeURIComponent(tab.url)
-      chrome.tabs.create({ url: `${AUTOCHECK_URL}/analyse?url=${url}` })
-      window.close()
+      // fall through to URL-only fallback
     }
+
+    // Fallback: open with URL only (content script not injected or store unreachable)
+    const url = encodeURIComponent(tab.url)
+    chrome.tabs.create({ url: `${AUTOCHECK_URL}/analyse?url=${url}` })
+    window.close()
   })
 })
