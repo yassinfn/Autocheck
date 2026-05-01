@@ -150,12 +150,56 @@ export async function POST(req: NextRequest) {
             (sourceUrl && detectCountryFromUrl(sourceUrl)) ||
             langToCountry(detectLanguageFromText(annonce!))
           const textWithHint = `[HINT: This listing appears to be from ${detectedCountry}. Respond entirely in the language of that country.]\n\n${annonce!}`
-          const text = await callClaude(
-            buildAnalysePrompt(textWithHint, historyData),
-            ANALYSE_SYSTEM,
-            4000
-          )
-          analyseData = extractJSON<WithoutReputation>(text)
+          const prompt = buildAnalysePrompt(textWithHint, historyData)
+
+          // Stream tokens directly from Anthropic → forward chunks to client
+          // so the user sees progress instead of a 40-60s blank spinner
+          const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': process.env.ANTHROPIC_API_KEY!,
+              'anthropic-version': '2023-06-01',
+            },
+            body: JSON.stringify({
+              model: 'claude-sonnet-4-6',
+              max_tokens: 4000,
+              stream: true,
+              system: ANALYSE_SYSTEM,
+              messages: [{ role: 'user', content: prompt }],
+            }),
+          })
+
+          if (!claudeRes.ok || !claudeRes.body) {
+            throw new Error(`Anthropic streaming error: ${claudeRes.status}`)
+          }
+
+          let fullText = ''
+          const claudeReader = claudeRes.body.getReader()
+          const claudeDec = new TextDecoder()
+          let claudeBuffer = ''
+
+          while (true) {
+            const { done, value } = await claudeReader.read()
+            if (done) break
+            claudeBuffer += claudeDec.decode(value, { stream: true })
+            const lines = claudeBuffer.split('\n')
+            claudeBuffer = lines.pop() ?? ''
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue
+              const raw = line.slice(6).trim()
+              if (!raw || raw === '[DONE]') continue
+              try {
+                const evt = JSON.parse(raw)
+                if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+                  fullText += evt.delta.text
+                  send(controller, { type: 'chunk', payload: evt.delta.text })
+                }
+              } catch {}
+            }
+          }
+
+          analyseData = extractJSON<WithoutReputation>(fullText)
           annonceText = annonce!
         }
 

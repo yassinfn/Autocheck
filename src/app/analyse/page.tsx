@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import AnnonceInput from '@/components/analyse/AnnonceInput'
+import StreamingDisplay from '@/components/analyse/StreamingDisplay'
 import ScoreBlock from '@/components/analyse/ScoreBlock'
 import ReputationBlock from '@/components/analyse/ReputationBlock'
 import DepensesBlock from '@/components/analyse/DepensesBlock'
@@ -70,6 +71,7 @@ export default function AnalysePage() {
   const [step, setStep] = useState<Step>('input')
   const [result, setResult] = useState<AnalyseResult | null>(null)
   const [streamPartial, setStreamPartial] = useState<AnalysePartial | null>(null)
+  const [streamText, setStreamText] = useState('')
   const [reputationLoading, setReputationLoading] = useState(false)
   const [historyData, setHistoryData] = useState<HistoryData | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -170,6 +172,7 @@ export default function AnalysePage() {
     setError(null)
     setResult(null)
     setStreamPartial(null)
+    setStreamText('')
     setReputationLoading(false)
     setLoadingIdx(0)
 
@@ -214,9 +217,12 @@ export default function AnalysePage() {
           if (!part.startsWith('data: ')) continue
           const event = JSON.parse(part.slice(6)) as { type: string; payload: unknown }
 
-          if (event.type === 'score') {
+          if (event.type === 'chunk') {
+            setStreamText(prev => prev + (event.payload as string))
+          } else if (event.type === 'score') {
             partial = event.payload as AnalysePartial
             setStreamPartial(partial)
+            setStreamText('')
             setReputationLoading(true)
             setStep('results')
             if (type !== 'image') localStorage.setItem('autocheck_annonce', annonce)
@@ -286,6 +292,7 @@ export default function AnalysePage() {
     setStep('input')
     setResult(null)
     setStreamPartial(null)
+    setStreamText('')
     setReputationLoading(false)
     setHistoryData(null)
     setError(null)
@@ -420,21 +427,27 @@ export default function AnalysePage() {
                 <span>Annonce récupérée depuis <strong>{getSiteName(bookmarkletSource)}</strong> — analyse en cours…</span>
               </div>
             )}
-            <Spinner size="lg" />
-            <div className="text-center">
-              <p className="text-lg font-semibold text-slate-900">Analyse en cours</p>
-              <p className="text-slate-500 mt-1 text-sm">{LOADING_MESSAGES[loadingIdx]}</p>
-            </div>
-            <div className="flex gap-1.5">
-              {LOADING_MESSAGES.map((_, i) => (
-                <div
-                  key={i}
-                  className={`h-1.5 w-8 rounded-full transition-colors ${
-                    i <= loadingIdx ? 'bg-indigo-600' : 'bg-slate-200'
-                  }`}
-                />
-              ))}
-            </div>
+            {streamText ? (
+              <StreamingDisplay text={streamText} />
+            ) : (
+              <>
+                <Spinner size="lg" />
+                <div className="text-center">
+                  <p className="text-lg font-semibold text-slate-900">Analyse en cours</p>
+                  <p className="text-slate-500 mt-1 text-sm">{LOADING_MESSAGES[loadingIdx]}</p>
+                </div>
+                <div className="flex gap-1.5">
+                  {LOADING_MESSAGES.map((_, i) => (
+                    <div
+                      key={i}
+                      className={`h-1.5 w-8 rounded-full transition-colors ${
+                        i <= loadingIdx ? 'bg-indigo-600' : 'bg-slate-200'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
 
