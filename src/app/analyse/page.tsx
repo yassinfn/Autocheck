@@ -87,6 +87,7 @@ export default function AnalysePage() {
     const token = params.get('token')
     const urlParam = params.get('url')
     const textParam = params.get('text')
+    const incomplete = params.get('incomplete')
 
     if (id) {
       loadAnalysisById(id)
@@ -117,6 +118,13 @@ export default function AnalysePage() {
     } else {
       // No URL params — restore from localStorage if an analysis is in progress
       const stored = localStorage.getItem('autocheck_analyse')
+      if (incomplete === '1') {
+        // A downstream page detected an incomplete analysis (no reputation) and redirected here
+        localStorage.removeItem('autocheck_analyse')
+        setError("Votre analyse précédente n'a pas pu être finalisée. Veuillez relancer l'analyse.")
+        window.history.replaceState({}, '', '/analyse')
+        return
+      }
       if (stored) {
         setIsFromHistory(localStorage.getItem('autocheck_from_history') === 'true')
         setLoadedAt(localStorage.getItem('autocheck_loaded_at'))
@@ -569,12 +577,23 @@ export default function AnalysePage() {
                   </button>
                   <button
                     onClick={() => {
+                      if (reputationLoading) return
                       const id = localStorage.getItem('autocheck_row_id')
                       window.location.href = id ? `/contact?id=${id}` : '/contact'
                     }}
-                    className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+                    disabled={reputationLoading}
+                    className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                      reputationLoading
+                        ? 'bg-indigo-300 text-white opacity-75 cursor-not-allowed'
+                        : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                    }`}
                   >
-                    {L.continuer_vendeur}
+                    {reputationLoading ? (
+                      <span className="flex items-center gap-2 justify-center">
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
+                        Finalisation de l&apos;analyse...
+                      </span>
+                    ) : L.continuer_vendeur}
                   </button>
                 </div>
               </div>

@@ -48,6 +48,10 @@ export default function ContactPage() {
     }
 
     const data = JSON.parse(stored) as AnalyseResult
+    if (!data.reputation) {
+      router.replace('/analyse?incomplete=1')
+      return
+    }
     const annonce = localStorage.getItem('autocheck_annonce') ?? ''
     const fromHistory = localStorage.getItem('autocheck_from_history') === 'true'
     setAnalyse(data)

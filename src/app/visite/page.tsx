@@ -59,6 +59,10 @@ export default function VisitePage() {
     }
 
     const data = JSON.parse(stored) as AnalyseResult
+    if (!data.reputation) {
+      router.replace('/analyse?incomplete=1')
+      return
+    }
     setAnalyse(data)
 
     const storedContact = localStorage.getItem('autocheck_contact')

@@ -174,34 +174,36 @@ export function generatePDF({
   gap()
 
   // ── REPUTATION ──────────────────────────────────────────────────────────────
-  sectionHeader(L.reputation_modele)
+  if (reputation) {
+    sectionHeader(L.reputation_modele)
 
-  if (reputation.pointsForts.length > 0) {
-    subHeader(L.points_forts)
-    reputation.pointsForts.forEach(p => bullet(p, 22, 163, 74))
-    gap(3)
-  }
+    if (reputation.pointsForts.length > 0) {
+      subHeader(L.points_forts)
+      reputation.pointsForts.forEach(p => bullet(p, 22, 163, 74))
+      gap(3)
+    }
 
-  if (reputation.problemesConnus.length > 0) {
-    subHeader(L.problemes_connus)
-    reputation.problemesConnus.forEach(p =>
-      bullet(`${clean(p.description)} (${p.gravite}, ${p.frequence})`, 180, 83, 9)
-    )
-    gap(3)
-  }
+    if (reputation.problemesConnus.length > 0) {
+      subHeader(L.problemes_connus)
+      reputation.problemesConnus.forEach(p =>
+        bullet(`${clean(p.description)} (${p.gravite}, ${p.frequence})`, 180, 83, 9)
+      )
+      gap(3)
+    }
 
-  if (reputation.rappelsConstructeur.length > 0) {
-    subHeader(L.rappels)
-    reputation.rappelsConstructeur.forEach(r =>
-      bullet(`${r.reference} - ${clean(r.description)}`)
-    )
-    gap(3)
-  }
+    if (reputation.rappelsConstructeur.length > 0) {
+      subHeader(L.rappels)
+      reputation.rappelsConstructeur.forEach(r =>
+        bullet(`${r.reference} - ${clean(r.description)}`)
+      )
+      gap(3)
+    }
 
-  if (reputation.analyse_generation?.explication) {
-    subHeader(L.analyse_generation)
-    bodyText(reputation.analyse_generation.explication)
-    gap(3)
+    if (reputation.analyse_generation?.explication) {
+      subHeader(L.analyse_generation)
+      bodyText(reputation.analyse_generation.explication)
+      gap(3)
+    }
   }
 
   // ── DEPENSES ────────────────────────────────────────────────────────────────

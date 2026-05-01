@@ -22,7 +22,7 @@ RÈGLES ABSOLUES:
 export function buildContactQuestionsPrompt(analyse: AnalyseResult, annonce?: string): string {
   const { vehicule, score, reputation, detection } = analyse
 
-  const problemesText = reputation.problemesConnus
+  const problemesText = (reputation?.problemesConnus ?? [])
     .map(p => `- ${p.description} (gravité: ${p.gravite}, fréquence: ${p.frequence})`)
     .join('\n')
 
@@ -100,7 +100,7 @@ Score initial: ${score.total}/100 | Pays: ${detection.pays} | Devise: ${detectio
 DÉPENSES OBLIGATOIRES ESTIMÉES: ${depenses.totalObligatoiresMin} à ${depenses.totalObligatoiresMax} ${detection.symbole}
 
 PROBLÈMES CONNUS DU MODÈLE:
-${reputation.problemesConnus.map(p => `- ${p.description} (${p.gravite}, ${p.frequence})`).join('\n') || '- Aucun'}
+${(reputation?.problemesConnus ?? []).map(p => `- ${p.description} (${p.gravite}, ${p.frequence})`).join('\n') || '- Aucun'}
 
 RÉPONSES DU VENDEUR:
 ${reponses}

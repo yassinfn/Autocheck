@@ -21,7 +21,7 @@ RÈGLES ABSOLUES:
 export function buildChecklistPrompt(analyse: AnalyseResult): string {
   const { vehicule, reputation, detection } = analyse
 
-  const problemes = reputation.problemesConnus
+  const problemes = (reputation?.problemesConnus ?? [])
     .map(p => `- ${p.description} (gravité: ${p.gravite}, fréquence: ${p.frequence})`)
     .join('\n') || '- Aucun problème spécifique connu'
 
@@ -65,7 +65,7 @@ export function buildScenarioPrompt(analyse: AnalyseResult): string {
   const { vehicule, score, reputation, detection } = analyse
   const age = new Date().getFullYear() - vehicule.annee
 
-  const problemes = reputation.problemesConnus
+  const problemes = (reputation?.problemesConnus ?? [])
     .map(p => `- ${p.description} (${p.gravite}, ${p.frequence})`)
     .join('\n') || '- Aucun problème spécifique connu'
 

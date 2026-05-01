@@ -49,6 +49,10 @@ export default function DecisionPage() {
     }
 
     const analyseData = JSON.parse(storedAnalyse) as AnalyseResult
+    if (!analyseData.reputation) {
+      router.replace('/analyse?incomplete=1')
+      return
+    }
     const visiteData = localStorage.getItem('autocheck_visite')
       ? (JSON.parse(localStorage.getItem('autocheck_visite')!) as VisiteData)
       : undefined
