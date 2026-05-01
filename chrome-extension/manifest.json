@@ -1,0 +1,69 @@
+{
+  "manifest_version": 3,
+  "name": "AutoCheck — Analyseur d'annonces auto",
+  "version": "1.0.0",
+  "description": "Analysez n'importe quelle annonce de voiture en 1 clic. Score, dépenses, verdict d'achat.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "Analyser cette annonce sur AutoCheck"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.leboncoin.fr/*",
+        "*://*.lacentrale.fr/*",
+        "*://*.autoscout24.fr/*",
+        "*://*.autoscout24.com/*",
+        "*://*.autoscout24.de/*",
+        "*://*.autoscout24.es/*",
+        "*://*.autoscout24.it/*",
+        "*://*.autoscout24.be/*",
+        "*://*.mobile.de/*",
+        "*://*.autotrader.co.uk/*",
+        "*://*.autotrader.com/*",
+        "*://*.autotrader.ca/*",
+        "*://*.cargurus.com/*",
+        "*://*.cargurus.ca/*",
+        "*://*.cars.com/*",
+        "*://*.coches.net/*",
+        "*://*.milanuncios.com/*",
+        "*://*.subito.it/*",
+        "*://*.standvirtual.com/*",
+        "*://*.kijiji.ca/*",
+        "*://*.paruvendu.fr/*",
+        "*://*.largus.fr/*",
+        "*://*.facebook.com/marketplace/*",
+        "*://*.olx.com/*",
+        "*://*.avito.ma/*",
+        "*://*.dubizzle.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": [
+    "*://*.leboncoin.fr/*",
+    "*://*.lacentrale.fr/*",
+    "*://*.autoscout24.*/*",
+    "*://*.mobile.de/*",
+    "*://*.autotrader.*/*",
+    "*://*.cargurus.*/*",
+    "*://*.cars.com/*",
+    "*://*.coches.net/*",
+    "*://*.subito.it/*",
+    "*://*.kijiji.ca/*",
+    "*://*.facebook.com/*",
+    "*://*.olx.com/*"
+  ]
+}
