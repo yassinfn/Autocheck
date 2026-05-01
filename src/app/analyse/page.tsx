@@ -137,10 +137,11 @@ export default function AnalysePage() {
     let partial: AnalysePartial | null = null
 
     try {
+      const sourceUrl = localStorage.getItem('autocheck_source_url') ?? undefined
       const body =
         type === 'image'
           ? { type: 'image', imageData, mimeType }
-          : { annonce, historyData: history }
+          : { annonce, historyData: history, sourceUrl }
 
       const res = await fetch('/api/analyse/stream', {
         method: 'POST',

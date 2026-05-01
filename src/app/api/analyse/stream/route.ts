@@ -4,6 +4,43 @@ import { supabase } from '@/lib/supabase'
 import { ANALYSE_SYSTEM, buildAnalysePrompt, buildReputationPrompt } from '@/lib/prompts/analyse'
 import type { AnalyseResult, ReputationResult, HistoryData } from '@/types'
 
+function detectCountryFromUrl(url: string): string | null {
+  const domainCountryMap: Record<string, string> = {
+    'leboncoin.fr': 'France',
+    'lacentrale.fr': 'France',
+    'paruvendu.fr': 'France',
+    'autoscout24.fr': 'France',
+    'largus.fr': 'France',
+    'cargurus.ca': 'Canada',
+    'autotrader.ca': 'Canada',
+    'kijiji.ca': 'Canada',
+    'cargurus.com': 'USA',
+    'cars.com': 'USA',
+    'autotrader.com': 'USA',
+    'autotrader.co.uk': 'UK',
+    'gumtree.com': 'UK',
+    'mobile.de': 'Germany',
+    'autoscout24.de': 'Germany',
+    'coches.net': 'Spain',
+    'milanuncios.com': 'Spain',
+    'autoscout24.es': 'Spain',
+    'subito.it': 'Italy',
+    'autoscout24.it': 'Italy',
+    'standvirtual.com': 'Portugal',
+    'custojusto.pt': 'Portugal',
+    'autoscout24.be': 'Belgium',
+    'avito.ma': 'Morocco',
+    'dubizzle.com': 'UAE',
+  }
+  try {
+    const hostname = new URL(url).hostname.toLowerCase()
+    for (const [domain, country] of Object.entries(domainCountryMap)) {
+      if (hostname.includes(domain)) return country
+    }
+  } catch {}
+  return null
+}
+
 function detectLanguageFromText(text: string): string {
   const t = text.toLowerCase()
   const scores: Record<string, number> = { fr: 0, en: 0, es: 0, pt: 0, it: 0, de: 0 }
@@ -73,12 +110,13 @@ function saveReputationToCache(cacheKey: string, data: ReputationResult): void {
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { annonce, type, imageData, mimeType, historyData } = body as {
+  const { annonce, type, imageData, mimeType, historyData, sourceUrl } = body as {
     annonce?: string
     type?: string
     imageData?: string
     mimeType?: string
     historyData?: HistoryData
+    sourceUrl?: string
   }
 
   const encoder = new TextEncoder()
@@ -108,8 +146,9 @@ export async function POST(req: NextRequest) {
           analyseData = extractJSON<WithoutReputation>(text)
           annonceText = `${analyseData.vehicule.marque} ${analyseData.vehicule.modele} ${analyseData.vehicule.version} ${analyseData.vehicule.annee} ${analyseData.vehicule.motorisation} ${analyseData.vehicule.boite} (${analyseData.detection.pays})`
         } else {
-          const detectedLang = detectLanguageFromText(annonce!)
-          const detectedCountry = langToCountry(detectedLang)
+          const detectedCountry =
+            (sourceUrl && detectCountryFromUrl(sourceUrl)) ||
+            langToCountry(detectLanguageFromText(annonce!))
           const textWithHint = `[HINT: This listing appears to be from ${detectedCountry}. Respond entirely in the language of that country.]\n\n${annonce!}`
           const text = await callClaude(
             buildAnalysePrompt(textWithHint, historyData),
