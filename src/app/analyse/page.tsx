@@ -181,6 +181,7 @@ export default function AnalysePage() {
     }, 2200)
 
     let partial: AnalysePartial | null = null
+    let reputationReceived = false
 
     try {
       const sourceUrl = localStorage.getItem('autocheck_source_url') ?? undefined
@@ -231,7 +232,10 @@ export default function AnalysePage() {
             setIsFromHistory(false)
             setLoadedAt(null)
             setHistoryData(history ?? null)
+            // Save immediately so CTA can navigate to contact before reputation arrives
+            localStorage.setItem('autocheck_analyse', JSON.stringify({ ...partial, reputation: null }))
           } else if (event.type === 'reputation') {
+            reputationReceived = true
             if (!partial) continue
             const reputation = event.payload as AnalyseResult['reputation']
             let updated: AnalysePartial = partial
@@ -266,6 +270,10 @@ export default function AnalysePage() {
             throw new Error((event.payload as { message: string }).message)
           }
         }
+      }
+      // Safety: if stream closed without a reputation event, clear loading state
+      if (!reputationReceived && partial) {
+        setReputationLoading(false)
       }
     } catch (err) {
       clearInterval(interval)
@@ -538,7 +546,7 @@ export default function AnalysePage() {
                 </div>
               </div>
             )}
-            {result && <ReputationBlock reputation={result.reputation} detection={result.detection} labels={L} />}
+            {result?.reputation && <ReputationBlock reputation={result.reputation} detection={result.detection} labels={L} />}
 
             <DepensesBlock depenses={displayData.depenses} symbole={displayData.detection.symbole} labels={L} />
 
@@ -559,22 +567,15 @@ export default function AnalysePage() {
                   >
                     ↺ {L.nouvelle_analyse}
                   </button>
-                  {reputationLoading ? (
-                    <div className="px-6 py-3 bg-indigo-400 text-white rounded-lg font-medium text-center flex items-center justify-center gap-2 cursor-wait">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Analyse en cours...
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        const id = localStorage.getItem('autocheck_row_id')
-                        window.location.href = id ? `/contact?id=${id}` : '/contact'
-                      }}
-                      className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
-                    >
-                      {L.continuer_vendeur}
-                    </button>
-                  )}
+                  <button
+                    onClick={() => {
+                      const id = localStorage.getItem('autocheck_row_id')
+                      window.location.href = id ? `/contact?id=${id}` : '/contact'
+                    }}
+                    className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+                  >
+                    {L.continuer_vendeur}
+                  </button>
                 </div>
               </div>
             </div>
