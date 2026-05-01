@@ -11,7 +11,8 @@ import QuestionsBlock from '@/components/contact/QuestionsBlock'
 import ReponsesForm, { type UploadedFile } from '@/components/contact/ReponsesForm'
 import VerdictBlock from '@/components/contact/VerdictBlock'
 import type { AnalyseResult, ContactQuestionsResult, ContactVerdict } from '@/types'
-import { getOrCreateSessionId, saveAnalysis } from '@/lib/saveAnalysis'
+import { supabase } from '@/lib/supabase'
+import { getOrCreateSessionId, saveAnalysis, restoreRowId } from '@/lib/saveAnalysis'
 
 type Step = 'loading-questions' | 'questions' | 'analysing' | 'verdict'
 
@@ -37,8 +38,14 @@ export default function ContactPage() {
   const [pendingHref, setPendingHref] = useState<string | null>(null)
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const urlId = params.get('id')
     const stored = localStorage.getItem('autocheck_analyse')
-    if (!stored) { router.replace('/analyse'); return }
+    if (!stored) {
+      if (urlId) { loadFromSupabase(urlId); return }
+      router.replace('/analyse')
+      return
+    }
 
     const data = JSON.parse(stored) as AnalyseResult
     const annonce = localStorage.getItem('autocheck_annonce') ?? ''
@@ -76,9 +83,42 @@ export default function ContactPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  async function loadFromSupabase(id: string) {
+    setStep('loading-questions')
+    try {
+      const { data, error } = await supabase
+        .from('analyses')
+        .select('id, created_at, analysis_data, contact_data, url_annonce')
+        .eq('id', id)
+        .single()
+      if (error || !data?.analysis_data) { router.replace('/analyse'); return }
+      restoreRowId(data.id)
+      localStorage.setItem('autocheck_analyse', JSON.stringify(data.analysis_data))
+      localStorage.setItem('autocheck_from_history', 'true')
+      localStorage.setItem('autocheck_loaded_at', data.created_at)
+      if (data.url_annonce) localStorage.setItem('autocheck_source_url', data.url_annonce)
+      const analyseData = data.analysis_data as AnalyseResult
+      setAnalyse(analyseData)
+      setIsFromHistory(true)
+      setLoadedAt(data.created_at)
+      if (data.contact_data) {
+        localStorage.setItem('autocheck_contact', JSON.stringify(data.contact_data))
+        setVerdict(data.contact_data as ContactVerdict)
+        setStep('verdict')
+      } else {
+        localStorage.removeItem('autocheck_contact')
+        generateQuestions(analyseData, '')
+      }
+    } catch {
+      router.replace('/analyse')
+    }
+  }
+
   function navigate(href: string) {
-    if (isModified) { setPendingHref(href); return }
-    window.location.href = href
+    const id = localStorage.getItem('autocheck_row_id')
+    const dest = (id && href !== '/analyse') ? `${href}?id=${id}` : href
+    if (isModified) { setPendingHref(dest); return }
+    window.location.href = dest
   }
 
   async function generateQuestions(data: AnalyseResult, annonce: string) {

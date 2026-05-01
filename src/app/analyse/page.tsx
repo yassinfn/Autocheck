@@ -299,11 +299,11 @@ export default function AnalysePage() {
     }
 
     if (row.step_reached >= 4) {
-      window.location.href = '/decision'
+      window.location.href = `/decision?id=${row.id}`
     } else if (row.step_reached >= 3) {
-      window.location.href = '/visite'
+      window.location.href = `/visite?id=${row.id}`
     } else if (row.step_reached >= 2) {
-      window.location.href = '/contact'
+      window.location.href = `/contact?id=${row.id}`
     } else {
       setIsFromHistory(true)
       setLoadedAt(row.created_at)
@@ -525,12 +525,15 @@ export default function AnalysePage() {
                       Analyse en cours...
                     </div>
                   ) : (
-                    <a
-                      href="/contact"
-                      className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors text-center"
+                    <button
+                      onClick={() => {
+                        const id = localStorage.getItem('autocheck_row_id')
+                        window.location.href = id ? `/contact?id=${id}` : '/contact'
+                      }}
+                      className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
                     >
                       {L.continuer_vendeur}
-                    </a>
+                    </button>
                   )}
                 </div>
               </div>

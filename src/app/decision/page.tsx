@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import Spinner from '@/components/ui/Spinner'
 import StepNav from '@/components/ui/StepNav'
 import type { AnalyseResult, VisiteData, ContactVerdict, DecisionFinale, DecisionType } from '@/types'
-import { getOrCreateSessionId, saveAnalysis } from '@/lib/saveAnalysis'
+import { supabase } from '@/lib/supabase'
+import { getOrCreateSessionId, saveAnalysis, restoreRowId } from '@/lib/saveAnalysis'
 import { generatePDF } from '@/lib/generatePDF'
 import BoutonTelechargement from '@/components/pdf/BoutonTelechargement'
 
@@ -38,8 +39,14 @@ export default function DecisionPage() {
   const [userChoice, setUserChoice] = useState<'acheter' | 'negocier' | 'refuser' | null>(null)
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const urlId = params.get('id')
     const storedAnalyse = localStorage.getItem('autocheck_analyse')
-    if (!storedAnalyse) { router.replace('/analyse'); return }
+    if (!storedAnalyse) {
+      if (urlId) { loadFromSupabase(urlId); return }
+      router.replace('/analyse')
+      return
+    }
 
     const analyseData = JSON.parse(storedAnalyse) as AnalyseResult
     const visiteData = localStorage.getItem('autocheck_visite')
@@ -72,6 +79,41 @@ export default function DecisionPage() {
     fetchDecision(analyseData, visiteData, contactData)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  async function loadFromSupabase(id: string) {
+    setLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('analyses')
+        .select('id, created_at, analysis_data, contact_data, visit_data, decision_data, url_annonce')
+        .eq('id', id)
+        .single()
+      if (error || !data?.analysis_data) { router.replace('/analyse'); return }
+      restoreRowId(data.id)
+      localStorage.setItem('autocheck_analyse', JSON.stringify(data.analysis_data))
+      localStorage.setItem('autocheck_from_history', 'true')
+      localStorage.setItem('autocheck_loaded_at', data.created_at)
+      if (data.url_annonce) localStorage.setItem('autocheck_source_url', data.url_annonce)
+      if (data.contact_data) localStorage.setItem('autocheck_contact', JSON.stringify(data.contact_data))
+      if (data.visit_data) localStorage.setItem('autocheck_visite', JSON.stringify(data.visit_data))
+      if (data.decision_data) localStorage.setItem('autocheck_decision', JSON.stringify(data.decision_data))
+      const analyseData = data.analysis_data as AnalyseResult
+      setAnalyse(analyseData)
+      setIsFromHistory(true)
+      setLoadedAt(data.created_at)
+      if (data.contact_data) setContactVerdict(data.contact_data as ContactVerdict)
+      if (data.visit_data) setVisite(data.visit_data as VisiteData)
+      if (data.decision_data) {
+        setDecision(data.decision_data as DecisionFinale)
+        setLoading(false)
+      } else {
+        fetchDecision(analyseData, data.visit_data as VisiteData ?? undefined, data.contact_data as ContactVerdict ?? undefined)
+      }
+    } catch {
+      router.replace('/analyse')
+      setLoading(false)
+    }
+  }
 
   async function fetchDecision(
     analyseData: AnalyseResult,
@@ -393,7 +435,10 @@ export default function DecisionPage() {
 
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4 flex items-center justify-between gap-3 flex-wrap">
               <button
-                onClick={() => { window.location.href = '/visite' }}
+                onClick={() => {
+                  const id = localStorage.getItem('autocheck_row_id')
+                  window.location.href = id ? `/visite?id=${id}` : '/visite'
+                }}
                 className="text-sm text-slate-500 hover:text-slate-700 transition-colors"
               >
                 ← Retour à la visite

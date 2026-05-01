@@ -17,7 +17,8 @@ import type {
   VideoAnalyseResult,
   ContactVerdict,
 } from '@/types'
-import { getOrCreateSessionId, saveAnalysis } from '@/lib/saveAnalysis'
+import { supabase } from '@/lib/supabase'
+import { getOrCreateSessionId, saveAnalysis, restoreRowId } from '@/lib/saveAnalysis'
 
 type Phase = 'loading' | 'error' | 'intro' | 'step' | 'transition' | 'recap'
 
@@ -48,8 +49,14 @@ export default function VisitePage() {
   const niveau2Steps = stepStates.filter(s => s.niveau === 2)
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const urlId = params.get('id')
     const stored = localStorage.getItem('autocheck_analyse')
-    if (!stored) { router.replace('/analyse'); return }
+    if (!stored) {
+      if (urlId) { loadFromSupabase(urlId); return }
+      router.replace('/analyse')
+      return
+    }
 
     const data = JSON.parse(stored) as AnalyseResult
     setAnalyse(data)
@@ -77,6 +84,40 @@ export default function VisitePage() {
     generateScenario(data)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  async function loadFromSupabase(id: string) {
+    setPhase('loading')
+    try {
+      const { data, error } = await supabase
+        .from('analyses')
+        .select('id, created_at, analysis_data, contact_data, visit_data, url_annonce')
+        .eq('id', id)
+        .single()
+      if (error || !data?.analysis_data) { router.replace('/analyse'); return }
+      restoreRowId(data.id)
+      localStorage.setItem('autocheck_analyse', JSON.stringify(data.analysis_data))
+      localStorage.setItem('autocheck_from_history', 'true')
+      localStorage.setItem('autocheck_loaded_at', data.created_at)
+      if (data.url_annonce) localStorage.setItem('autocheck_source_url', data.url_annonce)
+      if (data.contact_data) localStorage.setItem('autocheck_contact', JSON.stringify(data.contact_data))
+      if (data.visit_data) localStorage.setItem('autocheck_visite', JSON.stringify(data.visit_data))
+      const analyseData = data.analysis_data as AnalyseResult
+      setAnalyse(analyseData)
+      setIsFromHistory(true)
+      setLoadedAt(data.created_at)
+      if (data.contact_data) setContactVerdict(data.contact_data as ContactVerdict)
+      const visitData = data.visit_data as VisiteData | null
+      if (visitData?.steps?.length) {
+        setStepStates(visitData.steps)
+        if (visitData.videoAnalyse) setVideoAnalyse(visitData.videoAnalyse)
+        setPhase('recap')
+      } else {
+        generateScenario(analyseData)
+      }
+    } catch {
+      router.replace('/analyse')
+    }
+  }
 
   async function generateScenario(data: AnalyseResult) {
     setPhase('loading')
@@ -164,7 +205,8 @@ export default function VisitePage() {
     localStorage.removeItem('autocheck_decision')
     // Await so Supabase write completes before /decision loads and calls the API
     await saveAnalysis({ sessionId: getOrCreateSessionId(), visite: visiteData, stepReached: 3 })
-    router.push('/decision')
+    const rowId = localStorage.getItem('autocheck_row_id')
+    router.push(rowId ? `/decision?id=${rowId}` : '/decision')
   }
 
   if (!analyse) return null
