@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-const BOOKMARKLET_CODE = `javascript:(function(){var url=encodeURIComponent(window.location.href);var text=encodeURIComponent(document.body.innerText.slice(0,15000));var base='https://autocheck-green.vercel.app/analyse?';var full=base+'url='+url+'&text='+text;if(full.length>8000){window.open(base+'text='+text,'_blank');}else{window.open(full,'_blank');}})();`
+const BOOKMARKLET_CODE = `javascript:(function(){var url=encodeURIComponent(window.location.href);var text=encodeURIComponent(document.body.innerText.slice(0,15000));var base='https://autocheck-green.vercel.app/analyse?';var full=base+'url='+url+'&text='+text;window.location.href=(full.length>8000?base+'text='+text:full);})();`
 
 const STEPS = [
   {
