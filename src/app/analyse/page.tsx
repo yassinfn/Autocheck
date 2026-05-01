@@ -125,8 +125,27 @@ export default function AnalysePage() {
         .select('id, created_at, step_reached, analysis_data, contact_data, visit_data, decision_data, url_annonce')
         .eq('id', id)
         .single()
-      if (err || !data) { setStep('input'); return }
-      handleCacheHit(data as CachedRow)
+      if (err || !data || !data.analysis_data) { setStep('input'); return }
+      const row = data as CachedRow
+      // Restore all localStorage state
+      restoreRowId(row.id)
+      localStorage.setItem('autocheck_analyse', JSON.stringify(row.analysis_data))
+      localStorage.setItem('autocheck_from_history', 'true')
+      localStorage.setItem('autocheck_loaded_at', row.created_at)
+      if (row.url_annonce) localStorage.setItem('autocheck_source_url', row.url_annonce)
+      if (row.contact_data) localStorage.setItem('autocheck_contact', JSON.stringify(row.contact_data))
+      else localStorage.removeItem('autocheck_contact')
+      if (row.visit_data) localStorage.setItem('autocheck_visite', JSON.stringify(row.visit_data))
+      else localStorage.removeItem('autocheck_visite')
+      localStorage.removeItem('autocheck_questions')
+      localStorage.removeItem('autocheck_contact_responses')
+      if (row.decision_data) localStorage.setItem('autocheck_decision', JSON.stringify(row.decision_data))
+      else localStorage.removeItem('autocheck_decision')
+      // Always show results — never redirect forward (avoids StepNav loop)
+      setIsFromHistory(true)
+      setLoadedAt(row.created_at)
+      setResult(row.analysis_data)
+      setStep('results')
     } catch {
       setStep('input')
     }

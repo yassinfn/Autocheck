@@ -40,7 +40,7 @@ export default function StepNav({ current, navigate }: StepNavProps) {
               <div className={`w-3 h-px mx-0.5 shrink-0 ${isReachable ? 'bg-indigo-300' : 'bg-slate-200'}`} />
             )}
             <button
-              onClick={() => !isActive && isReachable && navigate(rowId && step.href !== '/analyse' ? `${step.href}?id=${rowId}` : step.href)}
+              onClick={() => !isActive && isReachable && navigate(rowId ? `${step.href}?id=${rowId}` : step.href)}
               disabled={isActive || !isReachable}
               className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
                 isActive
