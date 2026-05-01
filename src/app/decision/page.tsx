@@ -81,10 +81,15 @@ export default function DecisionPage() {
     setLoading(true)
     setError(null)
     try {
+      // Strip base64 photos from visite steps — not needed for decision generation, avoids large POST bodies
+      const visiteForApi = visiteData
+        ? { ...visiteData, steps: (visiteData.steps ?? []).map(({ photo: _p, ...rest }) => rest) }
+        : undefined
+
       const res = await fetch('/api/decision', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ analyse: analyseData, visite: visiteData, contactVerdict: contactData }),
+        body: JSON.stringify({ analyse: analyseData, visite: visiteForApi, contactVerdict: contactData }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)

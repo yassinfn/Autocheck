@@ -157,12 +157,13 @@ export default function VisitePage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  function saveAndGoToDecision() {
+  async function saveAndGoToDecision() {
     if (!analyse) return
     const visiteData: VisiteData = { steps: stepStates, videoAnalyse }
     localStorage.setItem('autocheck_visite', JSON.stringify(visiteData))
     localStorage.removeItem('autocheck_decision')
-    saveAnalysis({ sessionId: getOrCreateSessionId(), visite: visiteData, stepReached: 3 })
+    // Await so Supabase write completes before /decision loads and calls the API
+    await saveAnalysis({ sessionId: getOrCreateSessionId(), visite: visiteData, stepReached: 3 })
     router.push('/decision')
   }
 
