@@ -69,29 +69,51 @@ document.addEventListener('DOMContentLoaded', async () => {
     btn.innerHTML = '<div class="spinner"></div> Récupération...'
 
     try {
+      console.log('[AutoCheck] Récupération du contenu de la page...')
+
       const response = await chrome.tabs.sendMessage(tab.id, {
         action: 'getPageContent',
       })
 
+      console.log('[AutoCheck] Contenu reçu:', response ? 'OK' : 'VIDE')
+      console.log('[AutoCheck] URL:', response?.url?.slice(0, 50))
+      console.log('[AutoCheck] Texte length:', response?.text?.length)
+
       if (response && response.text) {
-        // POST content to server, get a short token back — avoids URL length limits
+        console.log('[AutoCheck] Envoi vers bookmarklet-store...')
+
         const res = await fetch(`${AUTOCHECK_URL}/api/bookmarklet-store`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: response.url, text: response.text }),
         })
-        const { token } = await res.json()
-        chrome.tabs.create({ url: `${AUTOCHECK_URL}/analyse?token=${token}` })
-        window.close()
-        return
-      }
-    } catch {
-      // fall through to URL-only fallback
-    }
 
-    // Fallback: open with URL only (content script not injected or store unreachable)
-    const url = encodeURIComponent(tab.url)
-    chrome.tabs.create({ url: `${AUTOCHECK_URL}/analyse?url=${url}` })
-    window.close()
+        console.log('[AutoCheck] Store response status:', res.status)
+
+        const data = await res.json()
+        console.log('[AutoCheck] Token reçu:', data.token)
+
+        if (data.token) {
+          const analyseUrl = `${AUTOCHECK_URL}/analyse?token=${data.token}`
+          console.log('[AutoCheck] Ouverture:', analyseUrl)
+          chrome.tabs.create({ url: analyseUrl })
+          window.close()
+        } else {
+          throw new Error('Pas de token reçu: ' + JSON.stringify(data))
+        }
+      } else {
+        throw new Error('Pas de contenu reçu depuis la page')
+      }
+    } catch (error) {
+      console.error('[AutoCheck] ERREUR:', error.message)
+
+      btn.disabled = false
+      btn.innerHTML = '🔍 Analyser cette annonce'
+
+      const errorDiv = document.createElement('div')
+      errorDiv.style.cssText = 'background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:10px;margin-top:10px;font-size:11px;color:#991b1b;word-break:break-all;'
+      errorDiv.textContent = error.message
+      document.querySelector('.content').appendChild(errorDiv)
+    }
   })
 })
