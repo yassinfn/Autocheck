@@ -116,7 +116,8 @@ export default function ContactPage() {
 
   function navigate(href: string) {
     const id = localStorage.getItem('autocheck_row_id')
-    const dest = (id && href !== '/analyse') ? `${href}?id=${id}` : href
+    const needsId = id && !href.startsWith('/analyse') && !href.includes('?id=')
+    const dest = needsId ? `${href}?id=${id}` : href
     if (isModified) { setPendingHref(dest); return }
     window.location.href = dest
   }
