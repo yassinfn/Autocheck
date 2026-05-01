@@ -65,6 +65,7 @@ export default function AnnonceInput({ onSubmit, onCacheHit, onStart, disabled, 
   const [scrapeError, setScrapeError] = useState<string | null>(null)
   const [cachedRow, setCachedRow] = useState<CachedRow | null>(null)
   const [inputMode, setInputMode] = useState<'url' | 'text'>(initialText ? 'text' : 'url')
+  const [showEmptyError, setShowEmptyError] = useState(false)
 
   // Autoviza state
   const [historyData, setHistoryData] = useState<HistoryData | null>(null)
@@ -205,7 +206,13 @@ export default function AnnonceInput({ onSubmit, onCacheHit, onStart, disabled, 
   }
 
   function handleFallbackSubmit() {
-    if (!fallbackTexte.trim() || disabled) return
+    if (disabled) return
+    if (inputMode === 'text' && !fallbackTexte.trim()) {
+      setShowEmptyError(true)
+      return
+    }
+    if (!fallbackTexte.trim()) return
+    setShowEmptyError(false)
     if (inputMode === 'text') {
       onStart?.()
       localStorage.removeItem('autocheck_source_url')
@@ -249,15 +256,24 @@ export default function AnnonceInput({ onSubmit, onCacheHit, onStart, disabled, 
             </p>
             <textarea
               value={fallbackTexte}
-              onChange={(e) => setFallbackTexte(e.target.value)}
+              onChange={(e) => { setFallbackTexte(e.target.value); if (showEmptyError) setShowEmptyError(false) }}
               placeholder="Collez ici le texte complet de l'annonce..."
               rows={10}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y"
+              className={`w-full rounded-lg border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y ${showEmptyError ? 'border-red-400' : 'border-slate-300'}`}
               disabled={disabled}
             />
+            <div className="flex justify-between text-xs text-slate-400 -mt-2">
+              <span>{fallbackTexte.length > 0 ? `${fallbackTexte.length} caractères` : "Collez ici le texte de l'annonce"}</span>
+              <span>{fallbackTexte.length > 500 ? '✅ Suffisant' : fallbackTexte.length > 0 ? '⚠️ Texte trop court' : ''}</span>
+            </div>
+            {showEmptyError && (
+              <p className="text-sm text-red-500">
+                ⚠️ Veuillez coller le texte complet de l&apos;annonce avant d&apos;analyser.
+              </p>
+            )}
             <button
               onClick={handleFallbackSubmit}
-              disabled={!fallbackTexte.trim() || disabled}
+              disabled={disabled}
               className="w-full py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               Analyser cette annonce
