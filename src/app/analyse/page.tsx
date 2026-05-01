@@ -112,14 +112,15 @@ export default function AnalysePage() {
       }
       setBookmarkletText(decodedText)
       handleSubmit(decodedText)
-    }
-    // No token/id/text in URL — restore from localStorage if an analysis is in progress
-    const stored = localStorage.getItem('autocheck_analyse')
-    if (stored) {
-      setIsFromHistory(localStorage.getItem('autocheck_from_history') === 'true')
-      setLoadedAt(localStorage.getItem('autocheck_loaded_at'))
-      setResult(JSON.parse(stored) as AnalyseResult)
-      setStep('results')
+    } else {
+      // No URL params — restore from localStorage if an analysis is in progress
+      const stored = localStorage.getItem('autocheck_analyse')
+      if (stored) {
+        setIsFromHistory(localStorage.getItem('autocheck_from_history') === 'true')
+        setLoadedAt(localStorage.getItem('autocheck_loaded_at'))
+        setResult(JSON.parse(stored) as AnalyseResult)
+        setStep('results')
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
