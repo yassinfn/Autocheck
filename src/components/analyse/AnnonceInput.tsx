@@ -32,6 +32,7 @@ interface AnnonceInputProps {
   onStart?: () => void
   disabled?: boolean
   initialUrl?: string
+  initialText?: string
 }
 
 function normalizeUrl(raw: string): string {
@@ -54,16 +55,16 @@ function fmtDate(iso: string) {
   })
 }
 
-export default function AnnonceInput({ onSubmit, onCacheHit, onStart, disabled, initialUrl }: AnnonceInputProps) {
+export default function AnnonceInput({ onSubmit, onCacheHit, onStart, disabled, initialUrl, initialText }: AnnonceInputProps) {
   const [url, setUrl] = useState(initialUrl ?? '')
-  const [fallbackTexte, setFallbackTexte] = useState('')
+  const [fallbackTexte, setFallbackTexte] = useState(initialText ?? '')
   const [showFallback, setShowFallback] = useState(false)
   const [scraping, setScraping] = useState(false)
   const [checking, setChecking] = useState(false)
   const [urlError, setUrlError] = useState<string | null>(null)
   const [scrapeError, setScrapeError] = useState<string | null>(null)
   const [cachedRow, setCachedRow] = useState<CachedRow | null>(null)
-  const [inputMode, setInputMode] = useState<'url' | 'text'>('url')
+  const [inputMode, setInputMode] = useState<'url' | 'text'>(initialText ? 'text' : 'url')
 
   // Autoviza state
   const [historyData, setHistoryData] = useState<HistoryData | null>(null)

@@ -42,6 +42,30 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+function getSiteName(url: string): string {
+  const sites: Record<string, string> = {
+    'leboncoin.fr': 'LeBonCoin',
+    'lacentrale.fr': 'La Centrale',
+    'autoscout24': 'AutoScout24',
+    'cargurus': 'CarGurus',
+    'autotrader': 'AutoTrader',
+    'mobile.de': 'Mobile.de',
+    'subito.it': 'Subito.it',
+    'coches.net': 'Coches.net',
+    'paruvendu.fr': 'ParuVendu',
+    'kijiji': 'Kijiji',
+    'gumtree': 'Gumtree',
+    'milanuncios.com': 'Milanuncios',
+    'standvirtual': 'StandVirtual',
+    'custojusto': 'CustoJusto',
+  }
+  const lower = url.toLowerCase()
+  for (const [domain, name] of Object.entries(sites)) {
+    if (lower.includes(domain)) return name
+  }
+  return 'votre site'
+}
+
 export default function AnalysePage() {
   const [step, setStep] = useState<Step>('input')
   const [result, setResult] = useState<AnalyseResult | null>(null)
@@ -52,11 +76,27 @@ export default function AnalysePage() {
   const [loadingIdx, setLoadingIdx] = useState(0)
   const [isFromHistory, setIsFromHistory] = useState(false)
   const [loadedAt, setLoadedAt] = useState<string | null>(null)
+  const [bookmarkletSource, setBookmarkletSource] = useState<string | null>(null)
+  const [bookmarkletText, setBookmarkletText] = useState<string | null>(null)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const id = params.get('id')
-    if (id) loadAnalysisById(id)
+    const urlParam = params.get('url')
+    const textParam = params.get('text')
+
+    if (id) {
+      loadAnalysisById(id)
+    } else if (textParam) {
+      const decodedText = decodeURIComponent(textParam)
+      if (urlParam) {
+        const decodedUrl = decodeURIComponent(urlParam)
+        localStorage.setItem('autocheck_source_url', decodedUrl)
+        setBookmarkletSource(decodedUrl)
+      }
+      setBookmarkletText(decodedText)
+      handleSubmit(decodedText)
+    }
     // No auto-restore from localStorage — always start fresh
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -267,6 +307,7 @@ export default function AnalysePage() {
           </div>
           <span className="font-bold text-slate-900">AutoCheck</span>
           <div className="ml-auto flex items-center gap-3">
+            <a href="/bookmarklet" className="text-xs text-slate-500 hover:text-slate-700 shrink-0">📋 Bouton magique</a>
             <a href="/historique" className="text-xs text-slate-500 hover:text-slate-700 shrink-0">Historique</a>
             <DownloadPDFButton />
             <StepNav current={1} navigate={(href) => { window.location.href = href }} />
@@ -291,7 +332,13 @@ export default function AnalysePage() {
               </div>
             )}
 
-            <AnnonceInput onSubmit={handleSubmit} onCacheHit={handleCacheHit} onStart={resetAnalyse} />
+            <AnnonceInput
+              onSubmit={handleSubmit}
+              onCacheHit={handleCacheHit}
+              onStart={resetAnalyse}
+              initialUrl={bookmarkletSource ?? undefined}
+              initialText={bookmarkletText ?? undefined}
+            />
 
             <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
@@ -323,6 +370,12 @@ export default function AnalysePage() {
         {/* LOADING STEP */}
         {step === 'loading' && (
           <div className="flex flex-col items-center justify-center min-h-[400px] gap-6">
+            {bookmarkletSource && (
+              <div className="w-full bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-sm text-green-800 flex items-center gap-2">
+                <span>✅</span>
+                <span>Annonce récupérée depuis <strong>{getSiteName(bookmarkletSource)}</strong> — analyse en cours…</span>
+              </div>
+            )}
             <Spinner size="lg" />
             <div className="text-center">
               <p className="text-lg font-semibold text-slate-900">Analyse en cours</p>
@@ -344,6 +397,14 @@ export default function AnalysePage() {
         {/* RESULTS STEP */}
         {step === 'results' && displayData && (
           <div className="space-y-5">
+            {/* Bookmarklet source banner */}
+            {bookmarkletSource && (
+              <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-sm text-green-800 flex items-center gap-2">
+                <span>✅</span>
+                <span>Annonce récupérée depuis <strong>{getSiteName(bookmarkletSource)}</strong></span>
+              </div>
+            )}
+
             {/* History banner */}
             {isFromHistory && loadedAt && (
               <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
