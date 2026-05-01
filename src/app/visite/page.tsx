@@ -19,6 +19,7 @@ import type {
 } from '@/types'
 import { supabase } from '@/lib/supabase'
 import { getOrCreateSessionId, saveAnalysis, restoreRowId } from '@/lib/saveAnalysis'
+import { MAX_MODIFS, dbg } from '@/lib/decisionCache'
 
 type Phase = 'loading' | 'error' | 'intro' | 'step' | 'transition' | 'recap'
 
@@ -37,8 +38,8 @@ export default function VisitePage() {
   const [error, setError] = useState<string | null>(null)
   const [isFromHistory, setIsFromHistory] = useState(false)
   const [loadedAt, setLoadedAt] = useState<string | null>(null)
+  const [modifCount3, setModifCount3] = useState(0)
 
-  // Indices of niveau 1 and niveau 2 steps in the flat stepStates array
   const niveau1Indices = stepStates
     .map((s, i) => ({ s, i }))
     .filter(({ s }) => (s.niveau ?? 1) === 1)
@@ -47,6 +48,28 @@ export default function VisitePage() {
 
   const niveau1Steps = stepStates.filter(s => (s.niveau ?? 1) === 1)
   const niveau2Steps = stepStates.filter(s => s.niveau === 2)
+
+  // Persist videoAnalyse changes (set from ScenarioRecap) to localStorage
+  useEffect(() => {
+    if (stepStates.length === 0) return
+    localStorage.setItem('autocheck_visite', JSON.stringify({ steps: stepStates, videoAnalyse }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoAnalyse])
+
+  function resumeFromSteps(steps: VisiteStepState[], vAnalyse?: VideoAnalyseResult) {
+    setStepStates(steps)
+    if (vAnalyse) setVideoAnalyse(vAnalyse)
+    const treatedCount = steps.filter(s => s.statut !== 'pending').length
+    if (treatedCount === steps.length) {
+      setPhase('recap')
+    } else if (treatedCount > 0) {
+      const firstPendingIdx = steps.findIndex(s => s.statut === 'pending')
+      setCurrentIdx(firstPendingIdx)
+      setPhase('step')
+    } else {
+      setPhase('intro')
+    }
+  }
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -72,29 +95,71 @@ export default function VisitePage() {
     setIsFromHistory(fromHistory)
     setLoadedAt(localStorage.getItem('autocheck_loaded_at'))
 
-    if (fromHistory) {
-      const savedVisite = localStorage.getItem('autocheck_visite')
-      if (savedVisite) {
-        const visitData = JSON.parse(savedVisite) as VisiteData
-        if (visitData.steps && visitData.steps.length > 0) {
-          setStepStates(visitData.steps)
-          if (visitData.videoAnalyse) setVideoAnalyse(visitData.videoAnalyse)
-          setPhase('recap')
-          return
-        }
+    const count3 = parseInt(localStorage.getItem('autocheck_modif_count3') ?? '0', 10)
+    setModifCount3(count3)
+    dbg('[MODIF COUNT] etape3 =', count3)
+
+    // Priority 1: visit data in localStorage
+    const savedVisite = localStorage.getItem('autocheck_visite')
+    if (savedVisite) {
+      const visitData = JSON.parse(savedVisite) as VisiteData
+      if (visitData.steps && visitData.steps.length > 0) {
+        dbg('[CACHE HIT] visit_data from localStorage')
+        resumeFromSteps(visitData.steps, visitData.videoAnalyse)
+        return
       }
     }
 
+    // Priority 2: Supabase fallback
+    const rowId = localStorage.getItem('autocheck_row_id')
+    if (rowId) {
+      dbg('[CACHE MISS] checking Supabase for rowId', rowId)
+      loadVisiteFromSupabase(rowId, data)
+      return
+    }
+
+    // Priority 3: generate from Claude
+    dbg('[CACHE MISS] generating scenario from Claude')
     generateScenario(data)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  async function loadVisiteFromSupabase(rowId: string, data: AnalyseResult) {
+    setPhase('loading')
+    try {
+      const { data: row, error } = await supabase
+        .from('analyses')
+        .select('visit_data, modifications_count_etape3')
+        .eq('id', rowId)
+        .single()
+      if (error || !row) { generateScenario(data); return }
+
+      const count3 = row.modifications_count_etape3 ?? 0
+      localStorage.setItem('autocheck_modif_count3', String(count3))
+      setModifCount3(count3)
+      dbg('[MODIF COUNT] etape3 from Supabase =', count3)
+
+      const visitData = row.visit_data as VisiteData | null
+      if (visitData?.steps?.length) {
+        dbg('[CACHE HIT] visit_data from Supabase')
+        localStorage.setItem('autocheck_visite', JSON.stringify(visitData))
+        resumeFromSteps(visitData.steps, visitData.videoAnalyse)
+        return
+      }
+
+      dbg('[CACHE MISS] generating scenario from Claude')
+      generateScenario(data)
+    } catch {
+      generateScenario(data)
+    }
+  }
 
   async function loadFromSupabase(id: string) {
     setPhase('loading')
     try {
       const { data, error } = await supabase
         .from('analyses')
-        .select('id, created_at, analysis_data, contact_data, visit_data, url_annonce')
+        .select('id, created_at, analysis_data, contact_data, visit_data, modifications_count_etape3, url_annonce')
         .eq('id', id)
         .single()
       if (error || !data?.analysis_data) { router.replace('/analyse'); return }
@@ -110,11 +175,14 @@ export default function VisitePage() {
       setIsFromHistory(true)
       setLoadedAt(data.created_at)
       if (data.contact_data) setContactVerdict(data.contact_data as ContactVerdict)
+
+      const count3 = data.modifications_count_etape3 ?? 0
+      localStorage.setItem('autocheck_modif_count3', String(count3))
+      setModifCount3(count3)
+
       const visitData = data.visit_data as VisiteData | null
       if (visitData?.steps?.length) {
-        setStepStates(visitData.steps)
-        if (visitData.videoAnalyse) setVideoAnalyse(visitData.videoAnalyse)
-        setPhase('recap')
+        resumeFromSteps(visitData.steps, visitData.videoAnalyse)
       } else {
         generateScenario(analyseData)
       }
@@ -142,6 +210,7 @@ export default function VisitePage() {
         commentaire: '',
       }))
       setStepStates(states)
+      localStorage.setItem('autocheck_visite', JSON.stringify({ steps: states }))
       setCurrentIdx(0)
       setPhase('intro')
     } catch (err) {
@@ -150,8 +219,10 @@ export default function VisitePage() {
     }
   }
 
-  function updateStep(idx: number, changes: Partial<VisiteStepState>) {
-    setStepStates(prev => prev.map((s, i) => i === idx ? { ...s, ...changes } : s))
+  function updateStep(idx: number, patch: Partial<VisiteStepState>) {
+    const updated = stepStates.map((s, i) => i === idx ? { ...s, ...patch } : s)
+    setStepStates(updated)
+    localStorage.setItem('autocheck_visite', JSON.stringify({ steps: updated, videoAnalyse }))
   }
 
   function handleVerdict(statut: 'ok' | 'nok' | 'passe') {
@@ -159,13 +230,11 @@ export default function VisitePage() {
   }
 
   function handleNext() {
-    // After last niveau 1 step → show transition screen
     if (currentIdx === lastNiveau1Idx && niveau2Steps.length > 0) {
       setPhase('transition')
       window.scrollTo({ top: 0, behavior: 'smooth' })
       return
     }
-    // After last step overall → recap
     if (currentIdx >= stepStates.length - 1) {
       setPhase('recap')
       return
@@ -175,7 +244,6 @@ export default function VisitePage() {
   }
 
   function handleTransitionContinue() {
-    // Advance to first niveau 2 step
     const firstNiveau2Idx = stepStates.findIndex(s => s.niveau === 2)
     if (firstNiveau2Idx !== -1) {
       setCurrentIdx(firstNiveau2Idx)
@@ -185,7 +253,6 @@ export default function VisitePage() {
   }
 
   function handleTransitionEnd() {
-    // Save only completed steps, skip to decision
     saveAndGoToDecision()
   }
 
@@ -197,6 +264,7 @@ export default function VisitePage() {
       photo: undefined,
     }))
     setStepStates(fresh)
+    localStorage.setItem('autocheck_visite', JSON.stringify({ steps: fresh }))
     setCurrentIdx(0)
     setPhase('step')
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -207,7 +275,6 @@ export default function VisitePage() {
     const visiteData: VisiteData = { steps: stepStates, videoAnalyse }
     localStorage.setItem('autocheck_visite', JSON.stringify(visiteData))
     localStorage.removeItem('autocheck_decision')
-    // Await so Supabase write completes before /decision loads and calls the API
     await saveAnalysis({ sessionId: getOrCreateSessionId(), visite: visiteData, stepReached: 3 })
     const rowId = localStorage.getItem('autocheck_row_id')
     router.push(rowId ? `/decision?id=${rowId}` : '/decision')
@@ -216,6 +283,8 @@ export default function VisitePage() {
   if (!analyse) return null
 
   const vehiculeKey = `${analyse.vehicule.marque} ${analyse.vehicule.modele} ${analyse.vehicule.motorisation}`
+  const atLimit3 = modifCount3 >= MAX_MODIFS
+  const remaining3 = MAX_MODIFS - modifCount3
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -294,21 +363,34 @@ export default function VisitePage() {
         )}
 
         {phase === 'step' && stepStates[currentIdx] && (
-          <ScenarioStep
-            key={currentIdx}
-            step={stepStates[currentIdx]}
-            stepNumber={currentIdx + 1}
-            totalSteps={stepStates.length}
-            isLast={currentIdx === stepStates.length - 1}
-            isLastNiveau1={currentIdx === lastNiveau1Idx && niveau2Steps.length > 0}
-            vehiculeKey={vehiculeKey}
-            onOK={() => handleVerdict('ok')}
-            onNOK={() => handleVerdict('nok')}
-            onPasse={() => handleVerdict('passe')}
-            onPhoto={base64 => updateStep(currentIdx, { photo: base64 })}
-            onCommentaire={text => updateStep(currentIdx, { commentaire: text })}
-            onNext={handleNext}
-          />
+          <>
+            {atLimit3 && (
+              <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+                Vous avez atteint la limite de {MAX_MODIFS} modifications affectant le verdict final.
+                Vous pouvez continuer la visite, mais le verdict final ne sera plus recalculé.
+              </div>
+            )}
+            {!atLimit3 && modifCount3 > 0 && (
+              <p className="mb-4 text-xs text-slate-400 text-center">
+                {remaining3} modification{remaining3 > 1 ? 's' : ''} restante{remaining3 > 1 ? 's' : ''}
+              </p>
+            )}
+            <ScenarioStep
+              key={currentIdx}
+              step={stepStates[currentIdx]}
+              stepNumber={currentIdx + 1}
+              totalSteps={stepStates.length}
+              isLast={currentIdx === stepStates.length - 1}
+              isLastNiveau1={currentIdx === lastNiveau1Idx && niveau2Steps.length > 0}
+              vehiculeKey={vehiculeKey}
+              onOK={() => handleVerdict('ok')}
+              onNOK={() => handleVerdict('nok')}
+              onPasse={() => handleVerdict('passe')}
+              onPhoto={base64 => updateStep(currentIdx, { photo: base64 })}
+              onCommentaire={text => updateStep(currentIdx, { commentaire: text })}
+              onNext={handleNext}
+            />
+          </>
         )}
 
         {phase === 'transition' && (
@@ -324,18 +406,31 @@ export default function VisitePage() {
         )}
 
         {phase === 'recap' && (
-          <ScenarioRecap
-            steps={stepStates}
-            marque={analyse.vehicule.marque}
-            modele={analyse.vehicule.modele}
-            langue={analyse.detection.langue}
-            videoAnalyse={videoAnalyse}
-            onVideoAnalyse={setVideoAnalyse}
-            onValidate={saveAndGoToDecision}
-            onRestart={handleRestart}
-            analyse={analyse}
-            contact={contactVerdict}
-          />
+          <>
+            {atLimit3 && (
+              <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+                Vous avez atteint la limite de {MAX_MODIFS} modifications affectant le verdict final.
+                Vous pouvez modifier la visite, mais le verdict final ne sera plus recalculé.
+              </div>
+            )}
+            {!atLimit3 && modifCount3 > 0 && (
+              <p className="mb-4 text-xs text-slate-400 text-center">
+                {remaining3} modification{remaining3 > 1 ? 's' : ''} restante{remaining3 > 1 ? 's' : ''}
+              </p>
+            )}
+            <ScenarioRecap
+              steps={stepStates}
+              marque={analyse.vehicule.marque}
+              modele={analyse.vehicule.modele}
+              langue={analyse.detection.langue}
+              videoAnalyse={videoAnalyse}
+              onVideoAnalyse={setVideoAnalyse}
+              onValidate={saveAndGoToDecision}
+              onRestart={handleRestart}
+              analyse={analyse}
+              contact={contactVerdict}
+            />
+          </>
         )}
       </main>
     </div>

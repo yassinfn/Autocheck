@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { AnalyseResult, ContactVerdict, VisiteData, DecisionFinale } from '@/types'
+import type { AnalyseResult, ContactQuestionsResult, ContactVerdict, VisiteData, DecisionFinale } from '@/types'
 
 export function getOrCreateSessionId(): string {
   if (typeof window === 'undefined') return ''
@@ -31,16 +31,20 @@ export function restoreRowId(id: string): void {
 interface SavePayload {
   sessionId: string
   analyse?: AnalyseResult
+  questions?: ContactQuestionsResult
   contactVerdict?: ContactVerdict
+  contactResponses?: string
   visite?: VisiteData
   decision?: DecisionFinale
   stepReached?: number
   urlAnnonce?: string
+  decisionHashes?: { global: string; etape2: string; etape3: string }
+  modifCounts?: { etape2: number; etape3: number }
 }
 
 export async function saveAnalysis(payload: SavePayload): Promise<void> {
   try {
-    const { sessionId, analyse, contactVerdict, visite, decision, stepReached, urlAnnonce } = payload
+    const { sessionId, analyse, questions, contactVerdict, contactResponses, visite, decision, stepReached, urlAnnonce, decisionHashes, modifCounts } = payload
 
     const record: Record<string, unknown> = {
       session_id: sessionId,
@@ -65,7 +69,18 @@ export async function saveAnalysis(payload: SavePayload): Promise<void> {
       record.finance_data = analyse.depenses
     }
 
+    if (questions) record.questions_data = questions
     if (contactVerdict) record.contact_data = contactVerdict
+    if (contactResponses !== undefined) record.contact_responses = contactResponses
+    if (decisionHashes) {
+      record.decision_input_hash = decisionHashes.global
+      record.decision_input_hash_etape2 = decisionHashes.etape2
+      record.decision_input_hash_etape3 = decisionHashes.etape3
+    }
+    if (modifCounts) {
+      record.modifications_count_etape2 = modifCounts.etape2
+      record.modifications_count_etape3 = modifCounts.etape3
+    }
     if (visite) record.visit_data = visite
     if (decision) {
       record.decision = decision.decision

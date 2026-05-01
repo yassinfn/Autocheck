@@ -13,6 +13,7 @@ import VerdictBlock from '@/components/contact/VerdictBlock'
 import type { AnalyseResult, ContactQuestionsResult, ContactVerdict } from '@/types'
 import { supabase } from '@/lib/supabase'
 import { getOrCreateSessionId, saveAnalysis, restoreRowId } from '@/lib/saveAnalysis'
+import { MAX_MODIFS, dbg } from '@/lib/decisionCache'
 
 type Step = 'loading-questions' | 'questions' | 'analysing' | 'verdict'
 
@@ -36,6 +37,7 @@ export default function ContactPage() {
   const [isUpdated, setIsUpdated] = useState(false)
   const [formKey, setFormKey] = useState(0)
   const [pendingHref, setPendingHref] = useState<string | null>(null)
+  const [modifCount2, setModifCount2] = useState(0)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -58,6 +60,10 @@ export default function ContactPage() {
     setIsFromHistory(fromHistory)
     setLoadedAt(localStorage.getItem('autocheck_loaded_at'))
 
+    const count2 = parseInt(localStorage.getItem('autocheck_modif_count2') ?? '0', 10)
+    setModifCount2(count2)
+    dbg('[MODIF COUNT] etape2 =', count2)
+
     const savedResp = localStorage.getItem('autocheck_contact_responses') ?? ''
     setSavedResponses(savedResp)
 
@@ -66,33 +72,99 @@ export default function ContactPage() {
     setSavedFiles(savedFilesData)
     setPendingFiles(savedFilesData)
 
-    if (fromHistory) {
+    // Priority 1: verdict in localStorage
+    const savedV = localStorage.getItem('autocheck_contact')
+    if (savedV) {
+      dbg('[CACHE HIT] verdict from localStorage')
+      setVerdict(JSON.parse(savedV) as ContactVerdict)
       const savedQ = localStorage.getItem('autocheck_questions')
-      const savedV = localStorage.getItem('autocheck_contact')
-
-      if (savedV) {
-        setVerdict(JSON.parse(savedV) as ContactVerdict)
-        if (savedQ) setQuestions(JSON.parse(savedQ) as ContactQuestionsResult)
-        setStep('verdict')
-        return
-      }
-      if (savedQ) {
-        setQuestions(JSON.parse(savedQ) as ContactQuestionsResult)
-        setStep('questions')
-        return
-      }
+      if (savedQ) setQuestions(JSON.parse(savedQ) as ContactQuestionsResult)
+      setStep('verdict')
+      return
     }
 
+    // Priority 2: questions in localStorage
+    const savedQ = localStorage.getItem('autocheck_questions')
+    if (savedQ) {
+      dbg('[CACHE HIT] questions from localStorage')
+      setQuestions(JSON.parse(savedQ) as ContactQuestionsResult)
+      setStep('questions')
+      return
+    }
+
+    // Priority 3 & 4: Supabase fallback
+    const rowId = localStorage.getItem('autocheck_row_id')
+    if (rowId) {
+      dbg('[CACHE MISS] checking Supabase for rowId', rowId)
+      loadQuestionsFromSupabase(rowId, data, annonce)
+      return
+    }
+
+    // Priority 5: generate from Claude
+    dbg('[CACHE MISS] generating questions from Claude')
     generateQuestions(data, annonce)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  async function loadQuestionsFromSupabase(rowId: string, data: AnalyseResult, annonce: string) {
+    setStep('loading-questions')
+    try {
+      const { data: row, error } = await supabase
+        .from('analyses')
+        .select('contact_data, questions_data, contact_responses, modifications_count_etape2')
+        .eq('id', rowId)
+        .single()
+      if (error || !row) { generateQuestions(data, annonce); return }
+
+      const count2 = row.modifications_count_etape2 ?? 0
+      localStorage.setItem('autocheck_modif_count2', String(count2))
+      setModifCount2(count2)
+      dbg('[MODIF COUNT] etape2 from Supabase =', count2)
+
+      if (row.contact_data) {
+        // Priority 3: verdict in Supabase
+        dbg('[CACHE HIT] verdict from Supabase')
+        localStorage.setItem('autocheck_contact', JSON.stringify(row.contact_data))
+        setVerdict(row.contact_data as ContactVerdict)
+        if (row.questions_data) {
+          localStorage.setItem('autocheck_questions', JSON.stringify(row.questions_data))
+          setQuestions(row.questions_data as ContactQuestionsResult)
+        }
+        if (row.contact_responses) {
+          localStorage.setItem('autocheck_contact_responses', row.contact_responses)
+          setSavedResponses(row.contact_responses)
+        }
+        setStep('verdict')
+        return
+      }
+
+      if (row.questions_data) {
+        // Priority 4: questions in Supabase
+        dbg('[CACHE HIT] questions from Supabase')
+        localStorage.setItem('autocheck_questions', JSON.stringify(row.questions_data))
+        setQuestions(row.questions_data as ContactQuestionsResult)
+        if (row.contact_responses) {
+          localStorage.setItem('autocheck_contact_responses', row.contact_responses)
+          setSavedResponses(row.contact_responses)
+        }
+        setStep('questions')
+        return
+      }
+
+      // Priority 5: generate from Claude
+      dbg('[CACHE MISS] generating questions from Claude')
+      generateQuestions(data, annonce)
+    } catch {
+      generateQuestions(data, annonce)
+    }
+  }
 
   async function loadFromSupabase(id: string) {
     setStep('loading-questions')
     try {
       const { data, error } = await supabase
         .from('analyses')
-        .select('id, created_at, analysis_data, contact_data, url_annonce')
+        .select('id, created_at, analysis_data, contact_data, questions_data, contact_responses, modifications_count_etape2, url_annonce')
         .eq('id', id)
         .single()
       if (error || !data?.analysis_data) { router.replace('/analyse'); return }
@@ -105,10 +177,26 @@ export default function ContactPage() {
       setAnalyse(analyseData)
       setIsFromHistory(true)
       setLoadedAt(data.created_at)
+
+      const count2 = data.modifications_count_etape2 ?? 0
+      localStorage.setItem('autocheck_modif_count2', String(count2))
+      setModifCount2(count2)
+
+      if (data.contact_responses) {
+        localStorage.setItem('autocheck_contact_responses', data.contact_responses)
+        setSavedResponses(data.contact_responses)
+      }
+      if (data.questions_data) {
+        localStorage.setItem('autocheck_questions', JSON.stringify(data.questions_data))
+        setQuestions(data.questions_data as ContactQuestionsResult)
+      }
+
       if (data.contact_data) {
         localStorage.setItem('autocheck_contact', JSON.stringify(data.contact_data))
         setVerdict(data.contact_data as ContactVerdict)
         setStep('verdict')
+      } else if (data.questions_data) {
+        setStep('questions')
       } else {
         localStorage.removeItem('autocheck_contact')
         generateQuestions(analyseData, '')
@@ -138,6 +226,7 @@ export default function ContactPage() {
       if (!res.ok) throw new Error(result.error)
       localStorage.setItem('autocheck_questions', JSON.stringify(result))
       setQuestions(result as ContactQuestionsResult)
+      saveAnalysis({ sessionId: getOrCreateSessionId(), questions: result as ContactQuestionsResult })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la génération des questions')
     }
@@ -147,8 +236,9 @@ export default function ContactPage() {
   async function handleAnalyseReponses(reponses: string, images: { data: string; mimeType: string }[]) {
     if (!analyse) return
 
-    const unchanged = isFromHistory && reponses === savedResponses && verdict
+    const unchanged = !!savedResponses && reponses === savedResponses && !!verdict
     if (unchanged) {
+      dbg('[CACHE HIT] responses unchanged, showing cached verdict')
       setStep('verdict')
       return
     }
@@ -172,7 +262,12 @@ export default function ContactPage() {
       setIsModified(false)
       setIsUpdated(true)
       setStep('verdict')
-      saveAnalysis({ sessionId: getOrCreateSessionId(), contactVerdict: result as ContactVerdict, stepReached: 2 })
+      saveAnalysis({
+        sessionId: getOrCreateSessionId(),
+        contactVerdict: result as ContactVerdict,
+        contactResponses: reponses,
+        stepReached: 2,
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur lors de l'analyse")
       setStep('questions')
@@ -196,6 +291,9 @@ export default function ContactPage() {
   }
 
   if (!analyse) return null
+
+  const atLimit2 = modifCount2 >= MAX_MODIFS
+  const remaining2 = MAX_MODIFS - modifCount2
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -279,28 +377,37 @@ export default function ContactPage() {
         {(step === 'questions' || step === 'analysing') && questions && (
           <div className="space-y-3">
             <QuestionsBlock result={questions} />
-            {isFromHistory && (
-              <button
-                onClick={handleRegenerateQuestions}
-                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-              >
-                ↺ Régénérer les questions
-              </button>
-            )}
+            <button
+              onClick={handleRegenerateQuestions}
+              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+            >
+              ↺ Régénérer les questions
+            </button>
           </div>
         )}
 
         {step === 'questions' && (
           <>
+            {atLimit2 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+                Vous avez atteint la limite de {MAX_MODIFS} modifications affectant le verdict final.
+                Vous pouvez encore modifier vos réponses, mais le verdict final ne sera plus recalculé.
+              </div>
+            )}
             <ReponsesForm
               key={formKey}
               onSubmit={handleAnalyseReponses}
               initialValue={savedResponses}
               initialFiles={savedFiles}
-              buttonLabel={isFromHistory && savedResponses ? 'Analyser les nouvelles réponses' : undefined}
+              buttonLabel={savedResponses ? 'Analyser les nouvelles réponses' : undefined}
               onTextChange={(text) => setIsModified(text !== savedResponses)}
               onFilesChange={setPendingFiles}
             />
+            {!atLimit2 && modifCount2 > 0 && (
+              <p className="text-xs text-slate-400 text-center">
+                {remaining2} modification{remaining2 > 1 ? 's' : ''} restante{remaining2 > 1 ? 's' : ''}
+              </p>
+            )}
             {/* Back nav */}
             <div className="flex items-center">
               <button
@@ -325,16 +432,14 @@ export default function ContactPage() {
 
         {step === 'verdict' && verdict && (
           <div className="space-y-4">
-            {isFromHistory && (
-              <div className="flex justify-end">
-                <button
-                  onClick={handleEditResponses}
-                  className="text-xs px-3 py-1.5 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
-                >
-                  Modifier les réponses
-                </button>
-              </div>
-            )}
+            <div className="flex justify-end">
+              <button
+                onClick={handleEditResponses}
+                className="text-xs px-3 py-1.5 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                Modifier les réponses
+              </button>
+            </div>
             <VerdictBlock
               verdict={verdict}
               detection={analyse.detection}

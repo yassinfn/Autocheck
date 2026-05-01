@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase'
 import { getOrCreateSessionId, saveAnalysis, restoreRowId } from '@/lib/saveAnalysis'
 import { generatePDF } from '@/lib/generatePDF'
 import BoutonTelechargement from '@/components/pdf/BoutonTelechargement'
+import { MAX_MODIFS, dbg, hashEtape2, hashEtape3, hashGlobal } from '@/lib/decisionCache'
 
 const DECISION_CONFIG: Record<DecisionType, {
   bg: string; border: string; text: string; icon: string; label: string
@@ -25,6 +26,12 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+interface HashUpdate {
+  h2: string; h3: string; hGlobal: string
+  incrCount2: boolean; incrCount3: boolean
+  count2: number; count3: number
+}
+
 export default function DecisionPage() {
   const router = useRouter()
   const [analyse, setAnalyse] = useState<AnalyseResult | null>(null)
@@ -37,6 +44,10 @@ export default function DecisionPage() {
   const [loadedAt, setLoadedAt] = useState<string | null>(null)
   const [isUpdated, setIsUpdated] = useState(false)
   const [userChoice, setUserChoice] = useState<'acheter' | 'negocier' | 'refuser' | null>(null)
+  const [modifCount2, setModifCount2] = useState(0)
+  const [modifCount3, setModifCount3] = useState(0)
+  const [limitReached, setLimitReached] = useState(false)
+  const [recalcMessage, setRecalcMessage] = useState<string | null>(null)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -61,7 +72,6 @@ export default function DecisionPage() {
       : undefined
 
     const fromHistory = localStorage.getItem('autocheck_from_history') === 'true'
-    const savedDecision = localStorage.getItem('autocheck_decision')
 
     setAnalyse(analyseData)
     setVisite(visiteData)
@@ -69,18 +79,13 @@ export default function DecisionPage() {
     setIsFromHistory(fromHistory)
     setLoadedAt(localStorage.getItem('autocheck_loaded_at'))
 
-    if (savedDecision) {
-      setDecision(JSON.parse(savedDecision) as DecisionFinale)
-      setLoading(false)
-      return
-    }
+    const count2 = parseInt(localStorage.getItem('autocheck_modif_count2') ?? '0', 10)
+    const count3 = parseInt(localStorage.getItem('autocheck_modif_count3') ?? '0', 10)
+    setModifCount2(count2)
+    setModifCount3(count3)
+    dbg('[MODIF COUNT] etape2 =', count2, 'etape3 =', count3)
 
-    if (fromHistory) {
-      setLoading(false)
-      return
-    }
-
-    fetchDecision(analyseData, visiteData, contactData)
+    computeAndFetchDecision(analyseData, visiteData, contactData)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -89,7 +94,7 @@ export default function DecisionPage() {
     try {
       const { data, error } = await supabase
         .from('analyses')
-        .select('id, created_at, analysis_data, contact_data, visit_data, decision_data, url_annonce')
+        .select('id, created_at, analysis_data, contact_data, visit_data, decision_data, contact_responses, decision_input_hash, decision_input_hash_etape2, decision_input_hash_etape3, modifications_count_etape2, modifications_count_etape3, url_annonce')
         .eq('id', id)
         .single()
       if (error || !data?.analysis_data) { router.replace('/analyse'); return }
@@ -101,20 +106,98 @@ export default function DecisionPage() {
       if (data.contact_data) localStorage.setItem('autocheck_contact', JSON.stringify(data.contact_data))
       if (data.visit_data) localStorage.setItem('autocheck_visite', JSON.stringify(data.visit_data))
       if (data.decision_data) localStorage.setItem('autocheck_decision', JSON.stringify(data.decision_data))
+      if (data.contact_responses) localStorage.setItem('autocheck_contact_responses', data.contact_responses)
+      if (data.decision_input_hash) localStorage.setItem('autocheck_decision_hash', data.decision_input_hash)
+      if (data.decision_input_hash_etape2) localStorage.setItem('autocheck_decision_hash2', data.decision_input_hash_etape2)
+      if (data.decision_input_hash_etape3) localStorage.setItem('autocheck_decision_hash3', data.decision_input_hash_etape3)
+
+      const count2 = data.modifications_count_etape2 ?? 0
+      const count3 = data.modifications_count_etape3 ?? 0
+      localStorage.setItem('autocheck_modif_count2', String(count2))
+      localStorage.setItem('autocheck_modif_count3', String(count3))
+
       const analyseData = data.analysis_data as AnalyseResult
+      const visiteData = (data.visit_data as VisiteData | null) ?? undefined
+      const contactData = (data.contact_data as ContactVerdict | null) ?? undefined
+
       setAnalyse(analyseData)
       setIsFromHistory(true)
       setLoadedAt(data.created_at)
-      if (data.contact_data) setContactVerdict(data.contact_data as ContactVerdict)
-      if (data.visit_data) setVisite(data.visit_data as VisiteData)
-      if (data.decision_data) {
-        setDecision(data.decision_data as DecisionFinale)
-        setLoading(false)
-      } else {
-        fetchDecision(analyseData, data.visit_data as VisiteData ?? undefined, data.contact_data as ContactVerdict ?? undefined)
-      }
+      if (contactData) setContactVerdict(contactData)
+      if (visiteData) setVisite(visiteData)
+      setModifCount2(count2)
+      setModifCount3(count3)
+
+      computeAndFetchDecision(analyseData, visiteData, contactData)
     } catch {
       router.replace('/analyse')
+      setLoading(false)
+    }
+  }
+
+  async function computeAndFetchDecision(
+    analyseData: AnalyseResult,
+    visiteData?: VisiteData,
+    contactData?: ContactVerdict,
+    forceFetch = false
+  ) {
+    const contactResponses = localStorage.getItem('autocheck_contact_responses') ?? ''
+    const steps = visiteData?.steps ?? []
+    const h2 = hashEtape2(contactResponses)
+    const h3 = hashEtape3(steps)
+    const hGlobal = hashGlobal(h2, h3)
+
+    const storedGlobal = localStorage.getItem('autocheck_decision_hash')
+    const storedH2 = localStorage.getItem('autocheck_decision_hash2')
+    const storedH3 = localStorage.getItem('autocheck_decision_hash3')
+    const savedDecision = localStorage.getItem('autocheck_decision')
+
+    const count2 = parseInt(localStorage.getItem('autocheck_modif_count2') ?? '0', 10)
+    const count3 = parseInt(localStorage.getItem('autocheck_modif_count3') ?? '0', 10)
+
+    dbg('[HASH] h2 =', h2, 'h3 =', h3, 'hGlobal =', hGlobal)
+    dbg('[HASH] stored global =', storedGlobal, 'h2 =', storedH2, 'h3 =', storedH3)
+
+    // CAS A: cache hit — inputs unchanged since last generation
+    if (!forceFetch && savedDecision && storedGlobal === hGlobal) {
+      dbg('[CACHE HIT] decision inputs unchanged')
+      setDecision(JSON.parse(savedDecision) as DecisionFinale)
+      setLoading(false)
+      return
+    }
+
+    // CAS B: first generation — no stored hash or no cached decision
+    if (!storedGlobal || !savedDecision) {
+      dbg('[CACHE MISS] first generation — no counter increment')
+      await fetchDecision(analyseData, visiteData, contactData, {
+        h2, h3, hGlobal, incrCount2: false, incrCount3: false, count2, count3,
+      })
+      return
+    }
+
+    // CAS C: modification detected
+    const h2Changed = !storedH2 || h2 !== storedH2
+    const h3Changed = !storedH3 || h3 !== storedH3
+    const incrCount2 = h2Changed && count2 < MAX_MODIFS
+    const incrCount3 = h3Changed && count3 < MAX_MODIFS
+    // canRecalculate = true si :
+    //  - Étape 2 a changé ET son compteur n'est pas à la limite (incrCount2)
+    //  - Étape 3 a changé ET son compteur n'est pas à la limite (incrCount3)
+    //  - Aucun sub-hash n'a changé (sécurité défensive : hash global différent
+    //    mais sub-hashs identiques, ex. corruption localStorage)
+    const canRecalculate = incrCount2 || incrCount3 || (!h2Changed && !h3Changed)
+
+    if (canRecalculate) {
+      dbg('[CACHE MISS] modification — recalculating')
+      if (incrCount2) dbg('[MODIF COUNT] incrementing etape2:', count2, '→', count2 + 1)
+      if (incrCount3) dbg('[MODIF COUNT] incrementing etape3:', count3, '→', count3 + 1)
+      await fetchDecision(analyseData, visiteData, contactData, {
+        h2, h3, hGlobal, incrCount2, incrCount3, count2, count3,
+      })
+    } else {
+      dbg('[LIMIT REACHED] etape2:', count2, 'etape3:', count3, '— showing cached decision')
+      setDecision(JSON.parse(savedDecision) as DecisionFinale)
+      setLimitReached(true)
       setLoading(false)
     }
   }
@@ -122,12 +205,12 @@ export default function DecisionPage() {
   async function fetchDecision(
     analyseData: AnalyseResult,
     visiteData?: VisiteData,
-    contactData?: ContactVerdict
+    contactData?: ContactVerdict,
+    hashUpdate?: HashUpdate
   ) {
     setLoading(true)
     setError(null)
     try {
-      // Strip base64 photos from visite steps — not needed for decision generation, avoids large POST bodies
       const visiteForApi = visiteData
         ? { ...visiteData, steps: (visiteData.steps ?? []).map(({ photo: _p, ...rest }) => rest) }
         : undefined
@@ -140,10 +223,36 @@ export default function DecisionPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       const decisionResult = data as DecisionFinale
+
+      localStorage.setItem('autocheck_decision', JSON.stringify(decisionResult))
       setDecision(decisionResult)
       setIsUpdated(true)
-      localStorage.setItem('autocheck_decision', JSON.stringify(decisionResult))
-      saveAnalysis({ sessionId: getOrCreateSessionId(), decision: decisionResult, stepReached: 4 })
+      setLimitReached(false)
+
+      if (hashUpdate) {
+        const { h2, h3, hGlobal, incrCount2, incrCount3, count2, count3 } = hashUpdate
+        const newCount2 = incrCount2 ? count2 + 1 : count2
+        const newCount3 = incrCount3 ? count3 + 1 : count3
+
+        localStorage.setItem('autocheck_decision_hash', hGlobal)
+        localStorage.setItem('autocheck_decision_hash2', h2)
+        localStorage.setItem('autocheck_decision_hash3', h3)
+        localStorage.setItem('autocheck_modif_count2', String(newCount2))
+        localStorage.setItem('autocheck_modif_count3', String(newCount3))
+        setModifCount2(newCount2)
+        setModifCount3(newCount3)
+        dbg('[MODIF COUNT] after recalc: etape2 =', newCount2, 'etape3 =', newCount3)
+
+        saveAnalysis({
+          sessionId: getOrCreateSessionId(),
+          decision: decisionResult,
+          decisionHashes: { global: hGlobal, etape2: h2, etape3: h3 },
+          modifCounts: { etape2: newCount2, etape3: newCount3 },
+          stepReached: 4,
+        })
+      } else {
+        saveAnalysis({ sessionId: getOrCreateSessionId(), decision: decisionResult, stepReached: 4 })
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la génération')
     }
@@ -152,9 +261,25 @@ export default function DecisionPage() {
 
   function handleRecalculate() {
     if (!analyse) return
+
+    // Anti-spam: skip API call if inputs haven't changed since last verdict
+    const contactResponses = localStorage.getItem('autocheck_contact_responses') ?? ''
+    const steps = visite?.steps ?? []
+    const h2 = hashEtape2(contactResponses)
+    const h3 = hashEtape3(steps)
+    const hGlobal = hashGlobal(h2, h3)
+    const storedGlobal = localStorage.getItem('autocheck_decision_hash')
+
+    if (storedGlobal === hGlobal) {
+      dbg('[RECALC SKIP] no changes since last verdict')
+      setRecalcMessage('Aucune modification à recalculer.')
+      setTimeout(() => setRecalcMessage(null), 3000)
+      return
+    }
+
     setIsUpdated(false)
-    localStorage.removeItem('autocheck_decision')
-    fetchDecision(analyse, visite, contactVerdict)
+    setLimitReached(false)
+    computeAndFetchDecision(analyse, visite, contactVerdict, true)
   }
 
   if (!analyse) return null
@@ -230,7 +355,7 @@ export default function DecisionPage() {
             <Spinner size="lg" />
             <p className="text-slate-500 text-sm">Génération de la recommandation finale...</p>
           </div>
-        ) : !decision && isFromHistory ? (
+        ) : !decision ? (
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-center space-y-4">
             <p className="text-slate-600 text-sm">Aucune recommandation enregistrée pour cette analyse.</p>
             <button
@@ -242,6 +367,12 @@ export default function DecisionPage() {
           </div>
         ) : decision && cfg ? (
           <>
+            {limitReached && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+                Limite de {MAX_MODIFS} modifications atteinte. Le verdict affiché correspond à vos dernières données analysées.
+              </div>
+            )}
+
             <div className={`rounded-xl border-2 ${cfg.bg} ${cfg.border} p-6`}>
               <div className="flex items-center gap-3 mb-3">
                 <span className={`text-3xl font-bold ${cfg.text}`}>{cfg.icon}</span>
@@ -447,20 +578,25 @@ export default function DecisionPage() {
               >
                 ← Retour à la visite
               </button>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleRecalculate}
-                  disabled={loading}
-                  className="px-4 py-2 border border-slate-300 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 disabled:opacity-50 transition-colors"
-                >
-                  ↺ Recalculer
-                </button>
-                <a
-                  href="/analyse"
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
-                >
-                  Nouvelle analyse
-                </a>
+              <div className="flex flex-col items-end gap-1">
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleRecalculate}
+                    disabled={loading || limitReached}
+                    className="px-4 py-2 border border-slate-300 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                  >
+                    ↺ Recalculer
+                  </button>
+                  <a
+                    href="/analyse"
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                  >
+                    Nouvelle analyse
+                  </a>
+                </div>
+                {recalcMessage && (
+                  <p className="text-xs text-slate-500">{recalcMessage}</p>
+                )}
               </div>
             </div>
           </>
