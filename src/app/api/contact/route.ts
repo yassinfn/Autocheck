@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+
+export const maxDuration = 60
 import { callClaude, callClaudeVision, extractJSON } from '@/lib/claude'
 import { CONTACT_SYSTEM, buildContactQuestionsPrompt, buildContactAnalysePrompt } from '@/lib/prompts/contact'
 import type { AnalyseResult, ContactQuestionsResult, ContactVerdict } from '@/types'

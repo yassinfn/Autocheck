@@ -11,6 +11,16 @@ import { generatePDF } from '@/lib/generatePDF'
 import BoutonTelechargement from '@/components/pdf/BoutonTelechargement'
 import { MAX_MODIFS, dbg, hashEtape2, hashEtape3, hashGlobal } from '@/lib/decisionCache'
 
+function normalize(item: unknown): string {
+  if (typeof item === 'string') return item
+  if (item && typeof item === 'object') {
+    const o = item as Record<string, unknown>
+    if (typeof o.titre === 'string') return o.detail ? `${o.titre} — ${o.detail}` : o.titre
+    if (typeof o.title === 'string') return o.title
+  }
+  return String(item ?? '')
+}
+
 const DECISION_CONFIG: Record<DecisionType, {
   bg: string; border: string; text: string; icon: string; label: string
 }> = {
@@ -403,7 +413,7 @@ export default function DecisionPage() {
                     <ul className="space-y-1.5">
                       {decision.pointsPositifs.map((p, i) => (
                         <li key={i} className="flex items-start gap-2 text-sm text-green-700">
-                          <span className="shrink-0 mt-0.5">✓</span><span>{p}</span>
+                          <span className="shrink-0 mt-0.5">✓</span><span>{normalize(p)}</span>
                         </li>
                       ))}
                     </ul>
@@ -415,7 +425,7 @@ export default function DecisionPage() {
                     <ul className="space-y-1.5">
                       {decision.risques.map((r, i) => (
                         <li key={i} className="flex items-start gap-2 text-sm text-red-700">
-                          <span className="shrink-0 mt-0.5">⚠</span><span>{r}</span>
+                          <span className="shrink-0 mt-0.5">⚠</span><span>{normalize(r)}</span>
                         </li>
                       ))}
                     </ul>

@@ -3,6 +3,9 @@
 import { useState, useRef } from 'react'
 import Spinner from '@/components/ui/Spinner'
 
+const MAX_FILE_SIZE = 2 * 1024 * 1024 // 2 Mo par fichier
+const MAX_FILES = 5
+
 export interface UploadedFile {
   name: string
   data: string
@@ -23,28 +26,48 @@ interface ReponsesFormProps {
 export default function ReponsesForm({ onSubmit, loading, initialValue, initialFiles, buttonLabel, onTextChange, onFilesChange }: ReponsesFormProps) {
   const [reponses, setReponses] = useState(initialValue ?? '')
   const [files, setFiles] = useState<UploadedFile[]>(initialFiles ?? [])
+  const [fileError, setFileError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    Array.from(e.target.files || []).forEach(file => {
-      const reader = new FileReader()
-      reader.onload = (ev) => {
-        const result = ev.target?.result as string
-        const base64 = result.split(',')[1]
-        setFiles(prev => {
-          const next = [...prev, {
-            name: file.name,
-            data: base64,
-            mimeType: file.type,
-            preview: file.type.startsWith('image/') ? result : undefined,
-          }]
-          onFilesChange?.(next)
-          return next
-        })
-      }
-      reader.readAsDataURL(file)
-    })
+    setFileError(null)
+    const incoming = Array.from(e.target.files || [])
     if (fileRef.current) fileRef.current.value = ''
+
+    for (const file of incoming) {
+      if (file.size > MAX_FILE_SIZE) {
+        setFileError(`"${file.name}" dépasse 2 Mo. Compresse l'image avant de l'ajouter.`)
+        return
+      }
+    }
+
+    setFiles(prev => {
+      if (prev.length + incoming.length > MAX_FILES) {
+        setFileError(`Maximum ${MAX_FILES} fichiers autorisés.`)
+        return prev
+      }
+
+      incoming.forEach(file => {
+        const reader = new FileReader()
+        reader.onload = (ev) => {
+          const result = ev.target?.result as string
+          const base64 = result.split(',')[1]
+          setFiles(current => {
+            const next = [...current, {
+              name: file.name,
+              data: base64,
+              mimeType: file.type,
+              preview: file.type.startsWith('image/') ? result : undefined,
+            }]
+            onFilesChange?.(next)
+            return next
+          })
+        }
+        reader.readAsDataURL(file)
+      })
+
+      return prev
+    })
   }
 
   function removeFile(idx: number) {
@@ -91,13 +114,19 @@ export default function ReponsesForm({ onSubmit, loading, initialValue, initialF
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          disabled={loading}
+          disabled={loading || files.length >= MAX_FILES}
           className="w-full border-2 border-dashed border-slate-300 rounded-lg py-4 flex flex-col items-center gap-1 text-slate-500 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <span className="text-xl">📎</span>
           <span className="text-sm font-medium">Joindre des documents (CT, factures, photos)</span>
-          <span className="text-xs text-slate-400">JPG, PNG, WebP</span>
+          <span className="text-xs text-slate-400">JPG, PNG, WebP · max 2 Mo/fichier · {files.length}/{MAX_FILES}</span>
         </button>
+
+        {fileError && (
+          <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            {fileError}
+          </p>
+        )}
 
         {files.length > 0 && (
           <div className="space-y-2">

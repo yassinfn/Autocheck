@@ -118,8 +118,8 @@ Réponds UNIQUEMENT avec ce JSON valide:
 {
   "scoreUpdate": 0,
   "scoreTotal": ${score.total},
-  "pointsPositifs": [],
-  "alertes": [],
+  "pointsPositifs": ["Point positif 1", "Point positif 2"],
+  "alertes": ["Signal d'alerte 1", "Signal d'alerte 2"],
   "bilanFinancier": {
     "items": [{"poste": "", "detail": "", "montantMin": 0, "montantMax": 0}],
     "totalMin": 0,

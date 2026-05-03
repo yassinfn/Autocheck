@@ -48,11 +48,20 @@ export function buildDecisionPrompt(
 ${nokText}`
     : ''
 
+  const toStr = (item: unknown): string => {
+    if (typeof item === 'string') return item
+    if (item && typeof item === 'object') {
+      const o = item as Record<string, unknown>
+      if (typeof o.titre === 'string') return o.detail ? `${o.titre} — ${o.detail}` : o.titre
+    }
+    return String(item ?? '')
+  }
+
   const contactSection = contactVerdict
     ? `\nRÉSULTATS CONTACT VENDEUR:
   Score après contact: ${contactVerdict.scoreTotal}/100 (${contactVerdict.scoreUpdate >= 0 ? '+' : ''}${contactVerdict.scoreUpdate} pts)
-  Points positifs: ${contactVerdict.pointsPositifs.join(', ') || 'aucun'}
-  Alertes: ${contactVerdict.alertes.join(', ') || 'aucune'}
+  Points positifs: ${contactVerdict.pointsPositifs.map(toStr).join(', ') || 'aucun'}
+  Alertes: ${contactVerdict.alertes.map(toStr).join(', ') || 'aucune'}
   Recommandation: ${contactVerdict.recommandation}`
     : ''
 

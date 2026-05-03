@@ -1,4 +1,6 @@
 import { NextRequest } from 'next/server'
+
+export const runtime = 'edge'
 import { callClaude, callClaudeVision, extractJSON } from '@/lib/claude'
 import { supabase } from '@/lib/supabase'
 import { ANALYSE_SYSTEM, buildAnalysePrompt, buildReputationPrompt } from '@/lib/prompts/analyse'

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+
+export const maxDuration = 60
 import { callClaudeVisionMulti, extractJSON } from '@/lib/claude'
 import { buildVideoAnalysePrompt } from '@/lib/prompts/visite'
 import type { VideoAnalyseResult } from '@/types'

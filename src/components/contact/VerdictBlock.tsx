@@ -1,5 +1,17 @@
 import type { ContactVerdict, DetectionResult } from '@/types'
 
+// Claude occasionally returns {titre, detail} objects instead of plain strings.
+// This helper normalises both formats so stored rows never crash the renderer.
+function normalize(item: unknown): string {
+  if (typeof item === 'string') return item
+  if (item && typeof item === 'object') {
+    const o = item as Record<string, unknown>
+    if (typeof o.titre === 'string') return o.detail ? `${o.titre} — ${o.detail}` : o.titre
+    if (typeof o.title === 'string') return o.title
+  }
+  return String(item ?? '')
+}
+
 interface VerdictBlockProps {
   verdict: ContactVerdict
   detection: DetectionResult
@@ -51,7 +63,7 @@ export default function VerdictBlock({ verdict, detection, onVisiter, onDecision
                 {verdict.pointsPositifs.map((p, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-green-700">
                     <span className="shrink-0 mt-0.5">✓</span>
-                    <span>{p}</span>
+                    <span>{normalize(p)}</span>
                   </li>
                 ))}
               </ul>
@@ -64,7 +76,7 @@ export default function VerdictBlock({ verdict, detection, onVisiter, onDecision
                 {verdict.alertes.map((a, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-orange-700">
                     <span className="shrink-0 mt-0.5">⚠</span>
-                    <span>{a}</span>
+                    <span>{normalize(a)}</span>
                   </li>
                 ))}
               </ul>

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+
+export const maxDuration = 60
 import { callClaude, callClaudeVision, extractJSON } from '@/lib/claude'
 import { VISITE_SYSTEM, buildChecklistPrompt, buildPhotoPrompt, buildScenarioPrompt } from '@/lib/prompts/visite'
 import type { AnalyseResult, ChecklistGeneratedResult, ScenarioResult } from '@/types'
