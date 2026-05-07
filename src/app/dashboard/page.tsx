@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronRight, Check, Lock, Scale, AlertTriangle } from 'lucide-react'
+import { ChevronRight, Check, Lock, Scale, AlertTriangle, RotateCcw } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,7 +72,7 @@ function Module({ id, icon, iconBg, title, subtitle, status, expanded, onToggle,
       {/* Accordion content */}
       <div className={`transition-all duration-200 overflow-hidden${expanded ? ' max-h-[1200px]' : ' max-h-0'}`}>
         {children && (
-          <div className="border-t border-slate-100 px-5 py-5">
+          <div className="border-t border-slate-200 px-5 py-5">
             {children}
           </div>
         )}
@@ -109,24 +109,6 @@ export default function DashboardPage() {
             <button type="button" className="text-xs text-slate-500 hover:text-slate-700 transition-colors">
               PDF
             </button>
-
-            {/* Simplified step progress */}
-            <div className="hidden sm:flex items-center gap-1.5">
-              {[
-                { n: 1, done: true },
-                { n: 2, done: false, active: true },
-                { n: 3, done: false },
-                { n: 4, done: false },
-              ].map(({ n, done, active }) => (
-                <div
-                  key={n}
-                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
-                    ${done ? 'bg-green-500 text-white' : active ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'}`}
-                >
-                  {done ? '✓' : n}
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </header>
@@ -181,10 +163,23 @@ export default function DashboardPage() {
           </div>
 
           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-            <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1.5">Score</p>
-            <p className="text-4xl font-bold text-amber-600 leading-none">
-              57<span className="text-base font-normal text-slate-400">/100</span>
-            </p>
+            <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Score</p>
+            <div className="flex items-center gap-3">
+              <div className="relative shrink-0 w-14 h-14">
+                <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                  <circle cx="50" cy="50" r="42" fill="none"
+                    stroke="rgb(241 245 249)" strokeWidth="10" />
+                  <circle cx="50" cy="50" r="42" fill="none"
+                    stroke="rgb(249 115 22)" strokeWidth="10"
+                    strokeDasharray={`${57 * 2.64} 264`}
+                    strokeLinecap="round" />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-base font-bold text-orange-500 leading-none">57</span>
+                </div>
+              </div>
+              <span className="text-sm text-slate-400">/100</span>
+            </div>
           </div>
 
           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
@@ -263,18 +258,18 @@ export default function DashboardPage() {
                 className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y"
               />
 
-              <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
                 <button
                   type="button"
-                  className="flex-1 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                  className="w-full sm:w-auto py-2.5 px-4 border border-slate-300 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
                 >
-                  Analyser les réponses
+                  Passer cette étape
                 </button>
                 <button
                   type="button"
-                  className="flex-1 py-2.5 border border-slate-300 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
+                  className="w-full sm:w-auto py-2.5 px-4 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
                 >
-                  Passer cette étape
+                  Analyser les réponses
                 </button>
               </div>
             </div>
@@ -321,9 +316,10 @@ export default function DashboardPage() {
         <div className="flex justify-end gap-2 pb-8">
           <button
             type="button"
-            className="px-4 py-2 border border-slate-300 text-slate-600 rounded-lg text-sm font-medium hover:bg-white transition-colors"
+            className="px-4 py-2 border border-slate-300 text-slate-600 rounded-lg text-sm font-medium hover:bg-white transition-colors flex items-center gap-1.5"
           >
-            Modifier
+            <RotateCcw size={14} />
+            Recommencer
           </button>
           <button
             type="button"
