@@ -124,16 +124,16 @@ export default function DashboardPage() {
             <label className="block text-sm font-medium text-slate-700">
               Colle une URL d&apos;annonce ou le texte de l&apos;annonce
             </label>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <input
                 type="text"
                 defaultValue="https://www.leboncoin.fr/ad/voitures/3130305065"
-                className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 readOnly
               />
               <button
                 type="button"
-                className="shrink-0 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                className="w-full sm:w-auto sm:shrink-0 px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
               >
                 Analyser
               </button>
@@ -164,7 +164,7 @@ export default function DashboardPage() {
 
           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
             <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Score</p>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 justify-center sm:justify-start">
               <div className="relative shrink-0 w-14 h-14">
                 <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
                   <circle cx="50" cy="50" r="42" fill="none"
