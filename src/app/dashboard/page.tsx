@@ -220,10 +220,11 @@ function DashboardContent() {
   // ── Auto-generate questions whenever a fresh analysis lands ──────────────────
   useEffect(() => {
     if (!analyse) return
+    if (isAnalyzing) return  // partial result during stream — wait for full
     if (questions !== null || contactVerdict !== null || contactSkipped || isGeneratingQuestions) return
     handleGenerateQuestions(analyse)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [analyse])
+  }, [analyse, isAnalyzing])
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -358,27 +359,58 @@ function DashboardContent() {
         annonceText = (scrapeData as { text: string }).text
       }
 
-      const res = await fetch('/api/analyse', {
+      const res = await fetch('/api/analyse/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ annonce: annonceText }),
+        body: JSON.stringify({ annonce: annonceText, sourceUrl }),
       })
 
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}))
-        throw new Error((json as { error?: string }).error ?? `Erreur ${res.status}`)
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error((data as { error?: string }).error ?? `Erreur ${res.status}`)
       }
 
-      const result: AnalyseResult = await res.json()
-      setAnalyse(result)
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let partial: Omit<AnalyseResult, 'reputation'> | null = null
 
-      const sessionId = getOrCreateSessionId()
-      await saveAnalysis({ sessionId, analyse: result, urlAnnonce: sourceUrl, stepReached: 1 })
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const parts = buffer.split('\n\n')
+        buffer = parts.pop() ?? ''
 
-      const newRowId = typeof window !== 'undefined' ? localStorage.getItem('autocheck_row_id') : null
-      if (newRowId) router.replace(`/dashboard?id=${newRowId}`)
+        for (const part of parts) {
+          if (!part.startsWith('data: ')) continue
+          let event: { type: string; payload: unknown }
+          try { event = JSON.parse(part.slice(6)) } catch { continue }
 
-      setExpandedModule(1)
+          if (event.type === 'score') {
+            // Progressive UX: fill the 3 cards immediately — isAnalyzing stays true
+            partial = event.payload as Omit<AnalyseResult, 'reputation'>
+            setAnalyse({ ...partial } as unknown as AnalyseResult)
+          } else if (event.type === 'reputation') {
+            if (!partial) continue
+            const fullResult: AnalyseResult = {
+              ...partial,
+              reputation: event.payload as AnalyseResult['reputation'],
+            }
+            setAnalyse(fullResult)
+            const sessionId = getOrCreateSessionId()
+            await saveAnalysis({ sessionId, analyse: fullResult, urlAnnonce: sourceUrl, stepReached: 1 })
+            const newRowId = typeof window !== 'undefined' ? localStorage.getItem('autocheck_row_id') : null
+            if (newRowId) router.replace(`/dashboard?id=${newRowId}`)
+            setExpandedModule(1)
+          } else if (event.type === 'error') {
+            throw new Error((event.payload as { message: string }).message)
+          }
+        }
+      }
+
+      // Safety: stream closed without reputation (edge-runtime cold start, etc.)
+      if (!partial) throw new Error("L'analyse n'a pas pu être complétée. Réessayez.")
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur inconnue')
       setExpandedModule(2)
