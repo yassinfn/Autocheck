@@ -69,7 +69,12 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        const result = extractJSON<ScenarioResult>(fullText)
+        // Strip markdown fences Claude occasionally adds in streaming mode
+        const cleaned = fullText
+          .replace(/^```(?:json)?\s*\n?/i, '')
+          .replace(/\n?```\s*$/i, '')
+          .trim()
+        const result = extractJSON<ScenarioResult>(cleaned)
         send(controller, { type: 'scenario', payload: result })
         send(controller, { type: 'done' })
       } catch (err) {
