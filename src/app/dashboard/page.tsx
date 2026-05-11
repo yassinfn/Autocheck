@@ -423,7 +423,7 @@ function DashboardContent() {
     : isGeneratingQuestions
     ? 'Génération des questions personnalisées…'
     : contactVerdict
-    ? `Score ${contactVerdict.scoreTotal}/100 · ${contactVerdict.alertes.length} signal${contactVerdict.alertes.length > 1 ? 'aux' : ''} d'alerte`
+    ? `Score ${contactVerdict.scoreTotal}/100 · ${contactVerdict.alertes.length} ${contactVerdict.alertes.length > 1 ? 'signaux' : 'signal'} d'alerte`
     : contactSkipped
     ? 'Étape ignorée'
     : isAnalyzingReponses
