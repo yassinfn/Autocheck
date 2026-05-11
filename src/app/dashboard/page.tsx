@@ -5,8 +5,9 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronRight, Check, Lock, Scale, AlertTriangle, RotateCcw, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { saveAnalysis, getOrCreateSessionId, clearRowId, restoreRowId } from '@/lib/saveAnalysis'
-import type { AnalyseResult, ContactQuestionsResult, ContactVerdict } from '@/types'
+import type { AnalyseResult, ContactQuestionsResult, ContactVerdict, VisiteData } from '@/types'
 import VerdictBlock from '@/components/contact/VerdictBlock'
+import InspectionOverlay from '@/components/dashboard/InspectionOverlay'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -129,6 +130,9 @@ function DashboardContent() {
 
   // Module 2 — Questions au vendeur
   const [questions, setQuestions] = useState<ContactQuestionsResult | null>(null)
+  // Module 3 — Inspection
+  const [inspectionOpen, setInspectionOpen] = useState(false)
+  const [visite, setVisite] = useState<VisiteData | null>(null)
   const [reponsesVendeur, setReponsesVendeur] = useState('')
   const [contactVerdict, setContactVerdict] = useState<ContactVerdict | null>(null)
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false)
@@ -152,7 +156,7 @@ function DashboardContent() {
       try {
         const { data, error: err } = await supabase
           .from('analyses')
-          .select('analysis_data, url_annonce, contact_data, questions_data, contact_responses')
+          .select('analysis_data, url_annonce, contact_data, questions_data, contact_responses, visit_data')
           .eq('id', rowId)
           .single()
 
@@ -186,13 +190,26 @@ function DashboardContent() {
           setContactSkipped(true)
         }
 
+        const visitFromSupabase = data.visit_data as VisiteData | null
+        if (visitFromSupabase?.steps?.length) {
+          setVisite(visitFromSupabase)
+          localStorage.setItem('autocheck_visite', JSON.stringify(visitFromSupabase))
+        } else {
+          const savedVisite = typeof window !== 'undefined' ? localStorage.getItem('autocheck_visite') : null
+          if (savedVisite) {
+            try { setVisite(JSON.parse(savedVisite) as VisiteData) } catch {}
+          }
+        }
+
         // Set analyse last so auto-generate useEffect fires after all contact state is batched
         setAnalyse(loaded)
 
-        if (hasVerdict)       setExpandedModule(1)
-        else if (skipped)     setExpandedModule(3)
+        const hasVisite = !!(visitFromSupabase?.steps?.length || localStorage.getItem('autocheck_visite'))
+        if (hasVisite)         setExpandedModule(3)
+        else if (hasVerdict)   setExpandedModule(1)
+        else if (skipped)      setExpandedModule(3)
         else if (hasQuestions) setExpandedModule(2)
-        else                  setExpandedModule(1)
+        else                   setExpandedModule(1)
       } catch {
         setExpandedModule(2)
       }
@@ -306,10 +323,12 @@ function DashboardContent() {
     setContactSkipped(false)
     setContactError(null)
     setShowDecisionHint(false)
+    setVisite(null)
     localStorage.removeItem('autocheck_questions')
     localStorage.removeItem('autocheck_contact')
     localStorage.removeItem('autocheck_contact_responses')
     localStorage.removeItem('autocheck_contact_skipped')
+    localStorage.removeItem('autocheck_visite')
 
     try {
       let annonceText = trimmed
@@ -383,10 +402,13 @@ function DashboardContent() {
     setContactSkipped(false)
     setContactError(null)
     setShowDecisionHint(false)
+    setVisite(null)
+    setInspectionOpen(false)
     localStorage.removeItem('autocheck_questions')
     localStorage.removeItem('autocheck_contact')
     localStorage.removeItem('autocheck_contact_responses')
     localStorage.removeItem('autocheck_contact_skipped')
+    localStorage.removeItem('autocheck_visite')
     router.replace('/dashboard')
   }
 
@@ -410,7 +432,28 @@ function DashboardContent() {
     ? 'analysing'
     : 'active'
 
-  const module3Status: ModuleStatus = (contactVerdict !== null || contactSkipped) ? 'active' : 'locked'
+  const visitSteps = visite?.steps ?? []
+  const visitDone = visitSteps.length > 0 && visitSteps.every(s => s.statut !== 'pending')
+  const visitInProgress = visitSteps.length > 0 && !visitDone
+  const visitOk = visitSteps.filter(s => s.statut === 'ok').length
+  const visitNok = visitSteps.filter(s => s.statut === 'nok').length
+  const visitPasse = visitSteps.filter(s => s.statut === 'passe').length
+  const visitCompleted = visitSteps.filter(s => s.statut !== 'pending').length
+
+  const module3Unlocked = contactVerdict !== null || contactSkipped
+  const module3Status: ModuleStatus = !module3Unlocked
+    ? 'locked'
+    : visitDone
+    ? 'done'
+    : 'active'
+
+  const module4Status: ModuleStatus = visitDone ? 'active' : 'locked'
+
+  const module3Subtitle = visitDone
+    ? `${visitSteps.length} étapes · ${visitNok} problème${visitNok > 1 ? 's' : ''} détecté${visitNok > 1 ? 's' : ''}`
+    : visitInProgress
+    ? `${visitCompleted}/${visitSteps.length} étapes complétées`
+    : '+20 pts de précision · ~ 15 min'
 
   const module1Subtitle = analyse
     ? `Score ${analyse.score.total}/100 · ${analyse.score.pointsAttention.length} risques détectés`
@@ -801,35 +844,96 @@ function DashboardContent() {
           {/* Module 3 — Inspection sur place */}
           <Module
             id={3}
-            icon={<span className={`text-sm font-bold ${module3Status !== 'locked' ? 'text-blue-600' : 'text-slate-500'}`}>3</span>}
-            iconBg={module3Status !== 'locked' ? 'bg-blue-100' : 'bg-slate-200'}
+            icon={
+              visitDone
+                ? <Check size={16} className="text-green-600" />
+                : <span className={`text-sm font-bold ${module3Unlocked ? 'text-blue-600' : 'text-slate-500'}`}>3</span>
+            }
+            iconBg={visitDone ? 'bg-green-100' : module3Unlocked ? 'bg-blue-100' : 'bg-slate-200'}
             title="Inspection sur place"
-            subtitle="+20 pts de précision · ~ 15 min"
+            subtitle={module3Subtitle}
             status={module3Status}
             expanded={expandedModule === 3}
             onToggle={handleToggle}
           >
-            <div className="space-y-4">
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Scénario d&apos;inspection sur-mesure : 12 étapes niveau 1, 8 étapes niveau 2.
-              </p>
-              <button
-                type="button"
-                className="px-4 py-2.5 border border-slate-300 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
-              >
-                Commencer l&apos;inspection
-              </button>
-            </div>
+            {/* State B — not started */}
+            {!visitDone && !visitInProgress && (
+              <div className="space-y-4">
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  Scénario d&apos;inspection sur-mesure généré par l&apos;IA, adapté à ce véhicule. Deux niveaux : contrôle rapide puis inspection complète.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setInspectionOpen(true)}
+                  className="px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                >
+                  Commencer l&apos;inspection
+                </button>
+              </div>
+            )}
+
+            {/* State C — in progress */}
+            {visitInProgress && !visitDone && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-4 text-sm">
+                  <span className="text-green-600 font-medium">✓ {visitOk} OK</span>
+                  <span className="text-red-600 font-medium">✗ {visitNok} NOK</span>
+                  <span className="text-slate-400">{visitPasse} passé{visitPasse > 1 ? 's' : ''}</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-1.5">
+                  <div
+                    className="bg-indigo-500 h-1.5 rounded-full transition-all"
+                    style={{ width: `${Math.round((visitCompleted / visitSteps.length) * 100)}%` }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setInspectionOpen(true)}
+                  className="px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                >
+                  Reprendre l&apos;inspection
+                </button>
+              </div>
+            )}
+
+            {/* State D — done */}
+            {visitDone && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-4 text-sm">
+                  <span className="text-green-600 font-medium">✓ {visitOk} OK</span>
+                  <span className="text-red-600 font-medium">✗ {visitNok} NOK</span>
+                  <span className="text-slate-400">{visitPasse} passé{visitPasse > 1 ? 's' : ''}</span>
+                </div>
+                {visitNok > 0 && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-1.5">
+                    <p className="text-xs font-semibold text-red-700 mb-2">Points NOK détectés</p>
+                    {visitSteps.filter(s => s.statut === 'nok').map((s, i) => (
+                      <p key={i} className="text-sm text-red-700 flex items-start gap-2">
+                        <span className="shrink-0 mt-0.5">✗</span>
+                        <span>{s.titre}</span>
+                      </p>
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setInspectionOpen(true)}
+                  className="px-4 py-2.5 border border-slate-300 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
+                >
+                  Voir le récapitulatif
+                </button>
+              </div>
+            )}
           </Module>
 
-          {/* Module 4 — Décision finale (locked) */}
+          {/* Module 4 — Décision finale */}
           <Module
             id={4}
-            icon={<Scale size={16} className="text-slate-400" />}
-            iconBg="bg-slate-100"
+            icon={<Scale size={16} className={module4Status !== 'locked' ? 'text-blue-600' : 'text-slate-400'} />}
+            iconBg={module4Status !== 'locked' ? 'bg-blue-100' : 'bg-slate-100'}
             title="Décision finale"
             subtitle="Disponible dès que l'inspection est complétée"
-            status="locked"
+            status={module4Status}
             expanded={false}
             onToggle={handleToggle}
           />
@@ -854,6 +958,22 @@ function DashboardContent() {
         </div>
 
       </main>
+
+      {/* ── INSPECTION OVERLAY ────────────────────────────────────────────── */}
+      {analyse && (
+        <InspectionOverlay
+          isOpen={inspectionOpen}
+          analyse={analyse}
+          initialVisite={visite}
+          contactVerdict={contactVerdict}
+          onClose={() => setInspectionOpen(false)}
+          onComplete={(v) => {
+            setVisite(v)
+            setInspectionOpen(false)
+            setExpandedModule(3)
+          }}
+        />
+      )}
     </div>
   )
 }
