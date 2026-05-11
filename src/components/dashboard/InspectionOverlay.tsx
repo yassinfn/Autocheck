@@ -112,33 +112,55 @@ export default function InspectionOverlay({
     setPhase('loading')
     setError(null)
     try {
-      const res = await fetch('/api/visite', {
+      const res = await fetch('/api/visite/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'scenario', analyse: data }),
+        body: JSON.stringify({ analyse: data }),
       })
-      const text = await res.text()
-      let result: Record<string, unknown>
-      try {
-        result = JSON.parse(text)
-      } catch {
-        throw new Error(
-          res.status === 504
-            ? 'Délai dépassé — la génération du scénario prend trop de temps. Réessayez.'
-            : `Erreur serveur (${res.status}). Réessayez dans quelques secondes.`
-        )
+
+      if (!res.ok || !res.body) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error((errData as { error?: string }).error ?? `Erreur serveur (${res.status})`)
       }
-      if (!res.ok) throw new Error((result.error as string | undefined) ?? `Erreur ${res.status}`)
-      const scenario = result as unknown as ScenarioResult
-      const states: VisiteStepState[] = scenario.steps.map(step => ({
-        ...step,
-        statut: 'pending',
-        commentaire: '',
-      }))
-      setStepStates(states)
-      localStorage.setItem('autocheck_visite', JSON.stringify({ steps: states }))
-      setCurrentIdx(0)
-      setPhase('intro')
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let scenarioReceived = false
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const parts = buffer.split('\n\n')
+        buffer = parts.pop() ?? ''
+
+        for (const part of parts) {
+          if (!part.startsWith('data: ')) continue
+          let event: { type: string; payload: unknown }
+          try { event = JSON.parse(part.slice(6)) } catch { continue }
+
+          if (event.type === 'scenario') {
+            scenarioReceived = true
+            const scenario = event.payload as ScenarioResult
+            const states: VisiteStepState[] = scenario.steps.map(step => ({
+              ...step,
+              statut: 'pending',
+              commentaire: '',
+            }))
+            setStepStates(states)
+            localStorage.setItem('autocheck_visite', JSON.stringify({ steps: states }))
+            setCurrentIdx(0)
+            setPhase('intro')
+          } else if (event.type === 'error') {
+            throw new Error((event.payload as { message: string }).message)
+          }
+        }
+      }
+
+      if (!scenarioReceived) {
+        throw new Error("Le scénario n'a pas pu être généré. Réessayez.")
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la génération du scénario')
       setPhase('error')
