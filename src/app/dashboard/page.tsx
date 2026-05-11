@@ -5,11 +5,12 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronRight, Check, Lock, Scale, AlertTriangle, RotateCcw, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { saveAnalysis, getOrCreateSessionId, clearRowId, restoreRowId } from '@/lib/saveAnalysis'
-import type { AnalyseResult } from '@/types'
+import type { AnalyseResult, ContactQuestionsResult, ContactVerdict } from '@/types'
+import VerdictBlock from '@/components/contact/VerdictBlock'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ModuleStatus = 'done' | 'active' | 'upcoming' | 'locked'
+type ModuleStatus = 'done' | 'active' | 'upcoming' | 'locked' | 'preparing' | 'skipped' | 'analysing'
 
 interface ModuleProps {
   id: number
@@ -26,10 +27,13 @@ interface ModuleProps {
 // ─── Status config ────────────────────────────────────────────────────────────
 
 const STATUS_CFG: Record<ModuleStatus, { label: string; badgeBg: string; badgeText: string }> = {
-  done:     { label: 'Terminé',     badgeBg: 'bg-green-100', badgeText: 'text-green-700' },
-  active:   { label: 'En cours',    badgeBg: 'bg-blue-100',  badgeText: 'text-blue-700'  },
-  upcoming: { label: 'À venir',     badgeBg: 'bg-slate-100', badgeText: 'text-slate-600' },
-  locked:   { label: 'Verrouillé',  badgeBg: 'bg-slate-100', badgeText: 'text-slate-500' },
+  done:      { label: 'Terminé',      badgeBg: 'bg-green-100', badgeText: 'text-green-700' },
+  active:    { label: 'En cours',     badgeBg: 'bg-blue-100',  badgeText: 'text-blue-700'  },
+  upcoming:  { label: 'À venir',      badgeBg: 'bg-slate-100', badgeText: 'text-slate-600' },
+  locked:    { label: 'Verrouillé',   badgeBg: 'bg-slate-100', badgeText: 'text-slate-500' },
+  preparing: { label: 'Préparation…', badgeBg: 'bg-blue-100',  badgeText: 'text-blue-700'  },
+  skipped:   { label: 'Sauté',        badgeBg: 'bg-slate-100', badgeText: 'text-slate-400' },
+  analysing: { label: 'Analyse…',     badgeBg: 'bg-blue-100',  badgeText: 'text-blue-700'  },
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -70,19 +74,15 @@ function Module({ id, icon, iconBg, title, subtitle, status, expanded, onToggle,
 
   return (
     <div className={`bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden${isLocked ? ' opacity-50' : ''}`}>
-      {/* Header row */}
       <button
         type="button"
         onClick={() => { if (!isLocked) onToggle(id) }}
         disabled={isLocked}
         className={`w-full px-5 py-4 flex items-center gap-4 text-left transition-colors${isLocked ? ' cursor-not-allowed' : ' hover:bg-slate-50'}`}
       >
-        {/* Circle icon */}
         <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${iconBg}`}>
           {icon}
         </div>
-
-        {/* Title + badge + subtitle */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-base font-semibold text-slate-900">{title}</span>
@@ -92,19 +92,12 @@ function Module({ id, icon, iconBg, title, subtitle, status, expanded, onToggle,
           </div>
           <p className="text-sm text-slate-500 mt-0.5">{subtitle}</p>
         </div>
-
-        {/* Right icon */}
         {isLocked
           ? <Lock size={16} className="shrink-0 text-slate-400" />
-          : <ChevronRight
-              size={18}
-              className={`shrink-0 text-slate-400 transition-transform duration-200${expanded ? ' rotate-90' : ''}`}
-            />
+          : <ChevronRight size={18} className={`shrink-0 text-slate-400 transition-transform duration-200${expanded ? ' rotate-90' : ''}`} />
         }
       </button>
-
-      {/* Accordion content */}
-      <div className={`transition-all duration-200 overflow-hidden${expanded ? ' max-h-[1200px]' : ' max-h-0'}`}>
+      <div className={`transition-all duration-200 overflow-hidden${expanded ? ' max-h-[2400px]' : ' max-h-0'}`}>
         {children && (
           <div className="border-t border-slate-200 px-5 py-5">
             {children}
@@ -127,13 +120,24 @@ function DashboardContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
+  // Module 1 — Analyse
   const [inputValue, setInputValue] = useState('')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analyse, setAnalyse] = useState<AnalyseResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [expandedModule, setExpandedModule] = useState<number | null>(null)
 
-  // ── Load existing analysis on mount ─────────────────────────────────────────
+  // Module 2 — Questions au vendeur
+  const [questions, setQuestions] = useState<ContactQuestionsResult | null>(null)
+  const [reponsesVendeur, setReponsesVendeur] = useState('')
+  const [contactVerdict, setContactVerdict] = useState<ContactVerdict | null>(null)
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false)
+  const [isAnalyzingReponses, setIsAnalyzingReponses] = useState(false)
+  const [contactSkipped, setContactSkipped] = useState(false)
+  const [contactError, setContactError] = useState<string | null>(null)
+  const [showDecisionHint, setShowDecisionHint] = useState(false)
+
+  // ── Load existing data on mount ──────────────────────────────────────────────
   useEffect(() => {
     const idFromUrl = searchParams.get('id')
     const idFromStorage = typeof window !== 'undefined' ? localStorage.getItem('autocheck_row_id') : null
@@ -148,7 +152,7 @@ function DashboardContent() {
       try {
         const { data, error: err } = await supabase
           .from('analyses')
-          .select('analysis_data, url_annonce')
+          .select('analysis_data, url_annonce, contact_data, questions_data, contact_responses')
           .eq('id', rowId)
           .single()
 
@@ -158,11 +162,37 @@ function DashboardContent() {
         }
 
         const loaded = data.analysis_data as AnalyseResult
-        setAnalyse(loaded)
-        setInputValue((data.url_annonce as string | null) ?? '')
         restoreRowId(rowId)
         if (!idFromUrl) router.replace(`/dashboard?id=${rowId}`)
-        setExpandedModule(1)
+        setInputValue((data.url_annonce as string | null) ?? '')
+
+        const hasVerdict = !!data.contact_data
+        const hasQuestions = !!data.questions_data
+        const skipped = typeof window !== 'undefined'
+          && localStorage.getItem('autocheck_contact_skipped') === 'true'
+
+        if (hasVerdict) {
+          setContactVerdict(data.contact_data as ContactVerdict)
+          localStorage.setItem('autocheck_contact', JSON.stringify(data.contact_data))
+        }
+        if (hasQuestions) {
+          setQuestions(data.questions_data as ContactQuestionsResult)
+          localStorage.setItem('autocheck_questions', JSON.stringify(data.questions_data))
+        }
+        if (data.contact_responses) {
+          setReponsesVendeur(data.contact_responses as string)
+        }
+        if (skipped && !hasVerdict) {
+          setContactSkipped(true)
+        }
+
+        // Set analyse last so auto-generate useEffect fires after all contact state is batched
+        setAnalyse(loaded)
+
+        if (hasVerdict)       setExpandedModule(1)
+        else if (skipped)     setExpandedModule(3)
+        else if (hasQuestions) setExpandedModule(2)
+        else                  setExpandedModule(1)
       } catch {
         setExpandedModule(2)
       }
@@ -170,10 +200,96 @@ function DashboardContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // ── Auto-generate questions whenever a fresh analysis lands ──────────────────
+  useEffect(() => {
+    if (!analyse) return
+    if (questions !== null || contactVerdict !== null || contactSkipped || isGeneratingQuestions) return
+    handleGenerateQuestions(analyse)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analyse])
+
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
   function handleToggle(id: number) {
     if (expandedModule !== id) setExpandedModule(id)
+  }
+
+  async function handleGenerateQuestions(a: AnalyseResult) {
+    if (isGeneratingQuestions) return
+    setIsGeneratingQuestions(true)
+    setContactError(null)
+    setExpandedModule(2)
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'questions', analyse: a }),
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error((result as { error?: string }).error ?? 'Erreur lors de la génération')
+      setQuestions(result as ContactQuestionsResult)
+      localStorage.setItem('autocheck_questions', JSON.stringify(result))
+      await saveAnalysis({ sessionId: getOrCreateSessionId(), questions: result as ContactQuestionsResult })
+    } catch (err) {
+      setContactError(err instanceof Error ? err.message : 'Impossible de générer les questions')
+    } finally {
+      setIsGeneratingQuestions(false)
+    }
+  }
+
+  async function handleAnalyserReponses() {
+    if (!analyse || reponsesVendeur.trim().length < 10) return
+    setIsAnalyzingReponses(true)
+    setContactError(null)
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'analyse', analyse, reponses: reponsesVendeur, images: [] }),
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error((result as { error?: string }).error ?? "Erreur lors de l'analyse")
+      const verdict = result as ContactVerdict
+      setContactVerdict(verdict)
+      localStorage.setItem('autocheck_contact', JSON.stringify(verdict))
+      localStorage.setItem('autocheck_contact_responses', reponsesVendeur)
+      await saveAnalysis({
+        sessionId: getOrCreateSessionId(),
+        contactVerdict: verdict,
+        contactResponses: reponsesVendeur,
+        stepReached: 2,
+      })
+      setExpandedModule(3)
+    } catch (err) {
+      setContactError(err instanceof Error ? err.message : "Erreur lors de l'analyse des réponses")
+    } finally {
+      setIsAnalyzingReponses(false)
+    }
+  }
+
+  async function handleSkipContact() {
+    if (!analyse) return
+    setContactSkipped(true)
+    localStorage.setItem('autocheck_contact_skipped', 'true')
+    setExpandedModule(3)
+    await saveAnalysis({ sessionId: getOrCreateSessionId(), stepReached: 2 })
+  }
+
+  function handleModifyResponses() {
+    setContactVerdict(null)
+    setShowDecisionHint(false)
+    localStorage.removeItem('autocheck_contact')
+    setExpandedModule(2)
+  }
+
+  function handleRegenerateQuestions() {
+    if (!analyse) return
+    localStorage.removeItem('autocheck_questions')
+    setQuestions(null)
+    setReponsesVendeur('')
+    setContactVerdict(null)
+    setShowDecisionHint(false)
+    handleGenerateQuestions(analyse)
   }
 
   async function handleAnalyser() {
@@ -184,6 +300,16 @@ function DashboardContent() {
     setError(null)
     setAnalyse(null)
     setExpandedModule(null)
+    setQuestions(null)
+    setReponsesVendeur('')
+    setContactVerdict(null)
+    setContactSkipped(false)
+    setContactError(null)
+    setShowDecisionHint(false)
+    localStorage.removeItem('autocheck_questions')
+    localStorage.removeItem('autocheck_contact')
+    localStorage.removeItem('autocheck_contact_responses')
+    localStorage.removeItem('autocheck_contact_skipped')
 
     try {
       let annonceText = trimmed
@@ -228,12 +354,7 @@ function DashboardContent() {
       setAnalyse(result)
 
       const sessionId = getOrCreateSessionId()
-      await saveAnalysis({
-        sessionId,
-        analyse: result,
-        urlAnnonce: sourceUrl,
-        stepReached: 1,
-      })
+      await saveAnalysis({ sessionId, analyse: result, urlAnnonce: sourceUrl, stepReached: 1 })
 
       const newRowId = typeof window !== 'undefined' ? localStorage.getItem('autocheck_row_id') : null
       if (newRowId) router.replace(`/dashboard?id=${newRowId}`)
@@ -254,23 +375,62 @@ function DashboardContent() {
     setInputValue('')
     setError(null)
     setExpandedModule(2)
+    setQuestions(null)
+    setReponsesVendeur('')
+    setContactVerdict(null)
+    setIsGeneratingQuestions(false)
+    setIsAnalyzingReponses(false)
+    setContactSkipped(false)
+    setContactError(null)
+    setShowDecisionHint(false)
+    localStorage.removeItem('autocheck_questions')
+    localStorage.removeItem('autocheck_contact')
+    localStorage.removeItem('autocheck_contact_responses')
+    localStorage.removeItem('autocheck_contact_skipped')
     router.replace('/dashboard')
   }
 
   // ── Derived display values ────────────────────────────────────────────────────
 
-  const score = analyse?.score.total ?? null
+  const score = contactVerdict?.scoreTotal ?? analyse?.score.total ?? null
   const vehicule = analyse?.vehicule ?? null
   const detection = analyse?.detection ?? null
 
   const module1Status: ModuleStatus = analyse ? 'done' : isAnalyzing ? 'active' : 'upcoming'
-  const module2Status: ModuleStatus = analyse ? 'active' : 'locked'
+
+  const module2Status: ModuleStatus = !analyse
+    ? 'locked'
+    : isGeneratingQuestions
+    ? 'preparing'
+    : contactVerdict
+    ? 'done'
+    : contactSkipped
+    ? 'skipped'
+    : isAnalyzingReponses
+    ? 'analysing'
+    : 'active'
+
+  const module3Status: ModuleStatus = (contactVerdict !== null || contactSkipped) ? 'active' : 'locked'
 
   const module1Subtitle = analyse
-    ? `Score ${score}/100 · ${analyse.score.pointsAttention.length} risques détectés`
+    ? `Score ${analyse.score.total}/100 · ${analyse.score.pointsAttention.length} risques détectés`
     : isAnalyzing
     ? 'Analyse en cours…'
     : "En attente d'une annonce"
+
+  const module2Subtitle = !analyse
+    ? '+15 pts de précision · ~ 2 min'
+    : isGeneratingQuestions
+    ? 'Génération des questions personnalisées…'
+    : contactVerdict
+    ? `Score ${contactVerdict.scoreTotal}/100 · ${contactVerdict.alertes.length} signal${contactVerdict.alertes.length > 1 ? 'aux' : ''} d'alerte`
+    : contactSkipped
+    ? 'Étape ignorée'
+    : isAnalyzingReponses
+    ? 'Analyse des réponses en cours…'
+    : questions
+    ? `${questions.questions.length} questions prêtes`
+    : '+15 pts de précision · ~ 2 min'
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -282,7 +442,6 @@ function DashboardContent() {
             <span className="text-white font-bold text-sm">AC</span>
           </a>
           <span className="font-bold text-slate-900">AutoCheck</span>
-
           <div className="ml-auto flex items-center gap-4">
             <a href="/historique" className="text-xs text-slate-500 hover:text-slate-700 transition-colors">
               Historique
@@ -300,7 +459,6 @@ function DashboardContent() {
         {/* ── INPUT ZONE ────────────────────────────────────────────────────── */}
         <div>
           <p className="text-slate-500 text-sm mb-3">Vérifie une annonce auto en 5 secondes.</p>
-
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
             <label className="block text-sm font-medium text-slate-700">
               Colle une URL d&apos;annonce ou le texte de l&apos;annonce
@@ -338,7 +496,6 @@ function DashboardContent() {
               </p>
             )}
           </div>
-
           <div className="text-center mt-3">
             <button
               type="button"
@@ -356,10 +513,7 @@ function DashboardContent() {
           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
             <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1.5">Véhicule</p>
             {isAnalyzing ? (
-              <div className="space-y-2">
-                <Skeleton className="h-5 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-              </div>
+              <div className="space-y-2"><Skeleton className="h-5 w-3/4" /><Skeleton className="h-4 w-1/2" /></div>
             ) : vehicule ? (
               <>
                 <p className="text-base font-bold text-slate-900">{vehicule.marque} {vehicule.modele}</p>
@@ -373,7 +527,7 @@ function DashboardContent() {
             )}
           </div>
 
-          {/* Score */}
+          {/* Score — updated by contactVerdict when present */}
           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
             <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Score</p>
             {isAnalyzing ? (
@@ -416,10 +570,7 @@ function DashboardContent() {
           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
             <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1.5">Prix</p>
             {isAnalyzing ? (
-              <div className="space-y-2">
-                <Skeleton className="h-5 w-2/3" />
-                <Skeleton className="h-4 w-3/4" />
-              </div>
+              <div className="space-y-2"><Skeleton className="h-5 w-2/3" /><Skeleton className="h-4 w-3/4" /></div>
             ) : vehicule && detection ? (
               <>
                 <p className="text-base font-bold text-slate-900">
@@ -464,9 +615,7 @@ function DashboardContent() {
             {analyse && (
               <div className="space-y-3">
                 {analyse.score.ressentGlobal && (
-                  <p className="text-sm text-slate-600 leading-relaxed">
-                    {analyse.score.ressentGlobal}
-                  </p>
+                  <p className="text-sm text-slate-600 leading-relaxed">{analyse.score.ressentGlobal}</p>
                 )}
                 {analyse.score.pointsAttention.length > 0 ? (
                   <div className="space-y-2">
@@ -489,62 +638,174 @@ function DashboardContent() {
           {/* Module 2 — Questions au vendeur */}
           <Module
             id={2}
-            icon={<span className={`text-sm font-bold ${analyse ? 'text-blue-600' : 'text-slate-400'}`}>2</span>}
-            iconBg={analyse ? 'bg-blue-100' : 'bg-slate-200'}
+            icon={
+              isGeneratingQuestions || isAnalyzingReponses
+                ? <Loader2 size={16} className="text-blue-600 animate-spin" />
+                : contactVerdict
+                ? <Check size={16} className="text-green-600" />
+                : <span className={`text-sm font-bold ${analyse && !contactSkipped ? 'text-blue-600' : 'text-slate-400'}`}>2</span>
+            }
+            iconBg={
+              contactVerdict ? 'bg-green-100'
+              : (isGeneratingQuestions || isAnalyzingReponses || (analyse && !contactSkipped)) ? 'bg-blue-100'
+              : 'bg-slate-200'
+            }
             title="Questions au vendeur"
-            subtitle="+15 pts de précision · ~ 2 min"
+            subtitle={module2Subtitle}
             status={module2Status}
             expanded={expandedModule === 2}
             onToggle={handleToggle}
           >
-            <div className="space-y-4">
-              <p className="text-sm text-slate-600">
-                5 questions à poser. Colle ensuite les réponses ci-dessous.
-              </p>
+            {/* ── État B : Génération des questions en cours ── */}
+            {isGeneratingQuestions && (
+              <div className="flex items-center gap-3 py-2">
+                <Loader2 size={16} className="shrink-0 animate-spin text-blue-600" />
+                <span className="text-sm text-slate-600">Génération des questions personnalisées…</span>
+              </div>
+            )}
 
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-2.5">
-                {[
-                  "Avez-vous le carnet d'entretien complet avec factures ?",
-                  "Le FAP a-t-il déjà été remplacé ou nettoyé ?",
-                  "Quand a été fait le dernier contrôle technique ?",
-                ].map((q, i) => (
-                  <p key={i} className="text-sm font-medium text-slate-800">
-                    {i + 1}. {q}
+            {/* ── Erreur génération sans questions ── */}
+            {!isGeneratingQuestions && !questions && !contactVerdict && !contactSkipped && contactError && (
+              <div className="space-y-3">
+                <p className="text-xs text-red-600 flex items-center gap-1.5">
+                  <AlertTriangle size={12} />
+                  {contactError}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => analyse && handleGenerateQuestions(analyse)}
+                  className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                >
+                  ↺ Réessayer
+                </button>
+              </div>
+            )}
+
+            {/* ── État C+D : Questions prêtes, en attente des réponses (ou analyse en cours) ── */}
+            {!isGeneratingQuestions && questions && !contactVerdict && !contactSkipped && (
+              <div className="space-y-4">
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-2.5">
+                  {questions.questions.map((q, i) => (
+                    <p key={i} className="text-sm font-medium text-slate-800">{i + 1}. {normalize(q)}</p>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRegenerateQuestions}
+                  disabled={isAnalyzingReponses}
+                  className="text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-50"
+                >
+                  ↺ Régénérer les questions
+                </button>
+                <textarea
+                  value={reponsesVendeur}
+                  onChange={e => setReponsesVendeur(e.target.value)}
+                  placeholder="Colle ici les réponses du vendeur..."
+                  rows={4}
+                  disabled={isAnalyzingReponses}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y disabled:opacity-60"
+                />
+                {contactError && (
+                  <p className="text-xs text-red-600 flex items-center gap-1.5">
+                    <AlertTriangle size={12} />
+                    {contactError}
                   </p>
-                ))}
+                )}
+                <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={handleSkipContact}
+                    disabled={isAnalyzingReponses}
+                    className="w-full sm:w-auto py-2.5 px-4 border border-slate-300 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-50"
+                  >
+                    Passer cette étape
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAnalyserReponses}
+                    disabled={isAnalyzingReponses || reponsesVendeur.trim().length < 10}
+                    className="w-full sm:w-auto py-2.5 px-4 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {isAnalyzingReponses && <Loader2 size={14} className="animate-spin" />}
+                    {isAnalyzingReponses ? 'Analyse…' : 'Analyser les réponses'}
+                  </button>
+                </div>
               </div>
+            )}
 
-              <textarea
-                placeholder="Colle ici les réponses du vendeur..."
-                rows={4}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y"
-              />
+            {/* ── État E : Verdict reçu ── */}
+            {!isGeneratingQuestions && contactVerdict && analyse && (
+              <div className="space-y-4">
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleModifyResponses}
+                    className="text-xs px-3 py-1.5 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    Modifier les réponses
+                  </button>
+                </div>
+                <VerdictBlock
+                  verdict={contactVerdict}
+                  detection={analyse.detection}
+                  onVisiter={() => setExpandedModule(3)}
+                  onDecisionNow={() => {
+                    setShowDecisionHint(true)
+                    setTimeout(() => setShowDecisionHint(false), 4000)
+                  }}
+                />
+                {showDecisionHint && (
+                  <p className="text-xs text-center text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5">
+                    Complétez d&apos;abord l&apos;inspection (Module 3) pour débloquer la décision finale.
+                  </p>
+                )}
+              </div>
+            )}
 
-              <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
+            {/* ── État F : Étape sautée ── */}
+            {contactSkipped && !contactVerdict && !isGeneratingQuestions && (
+              <div className="space-y-4">
+                <p className="text-sm text-slate-500">
+                  Étape ignorée. Vous pouvez reprendre si vous avez obtenu des réponses du vendeur.
+                </p>
+                {questions && (
+                  <>
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-2.5">
+                      {questions.questions.map((q, i) => (
+                        <p key={i} className="text-sm font-medium text-slate-800">{i + 1}. {normalize(q)}</p>
+                      ))}
+                    </div>
+                    <textarea
+                      value={reponsesVendeur}
+                      onChange={e => setReponsesVendeur(e.target.value)}
+                      placeholder="Colle ici les réponses du vendeur..."
+                      rows={4}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y"
+                    />
+                  </>
+                )}
                 <button
                   type="button"
-                  className="w-full sm:w-auto py-2.5 px-4 border border-slate-300 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
+                  onClick={() => {
+                    setContactSkipped(false)
+                    localStorage.removeItem('autocheck_contact_skipped')
+                  }}
+                  className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
                 >
-                  Passer cette étape
-                </button>
-                <button
-                  type="button"
-                  className="w-full sm:w-auto py-2.5 px-4 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
-                >
-                  Analyser les réponses
+                  ↺ Reprendre l&apos;étape
                 </button>
               </div>
-            </div>
+            )}
           </Module>
 
           {/* Module 3 — Inspection sur place */}
           <Module
             id={3}
-            icon={<span className="text-sm font-bold text-slate-500">3</span>}
-            iconBg="bg-slate-200"
+            icon={<span className={`text-sm font-bold ${module3Status !== 'locked' ? 'text-blue-600' : 'text-slate-500'}`}>3</span>}
+            iconBg={module3Status !== 'locked' ? 'bg-blue-100' : 'bg-slate-200'}
             title="Inspection sur place"
             subtitle="+20 pts de précision · ~ 15 min"
-            status="locked"
+            status={module3Status}
             expanded={expandedModule === 3}
             onToggle={handleToggle}
           >
@@ -567,7 +828,7 @@ function DashboardContent() {
             icon={<Scale size={16} className="text-slate-400" />}
             iconBg="bg-slate-100"
             title="Décision finale"
-            subtitle="Disponible dès qu'une étape est complétée"
+            subtitle="Disponible dès que l'inspection est complétée"
             status="locked"
             expanded={false}
             onToggle={handleToggle}
