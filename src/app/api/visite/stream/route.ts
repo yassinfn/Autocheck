@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
           },
           body: JSON.stringify({
             model: 'claude-sonnet-4-6',
-            max_tokens: 5000,
+            max_tokens: 8000,
             stream: true,
             system: VISITE_SYSTEM,
             messages: [{ role: 'user', content: buildScenarioPrompt(analyse) }],
@@ -74,6 +74,19 @@ export async function POST(req: NextRequest) {
           .replace(/^```(?:json)?\s*\n?/i, '')
           .replace(/\n?```\s*$/i, '')
           .trim()
+
+        console.log('[visite-stream] fullText length:', fullText.length)
+        console.log('[visite-stream] fullText end (last 200 chars):', fullText.slice(-200))
+        console.log('[visite-stream] cleaned length:', cleaned.length)
+        console.log('[visite-stream] cleaned end:', cleaned.slice(-200))
+
+        if (cleaned.length < 100) {
+          throw new Error('Réponse Claude trop courte, réessayez.')
+        }
+        if (!cleaned.trimEnd().endsWith('}')) {
+          throw new Error(`Réponse Claude tronquée (${cleaned.length} chars, finit par: "${cleaned.slice(-30)}"). Réessayez.`)
+        }
+
         const result = extractJSON<ScenarioResult>(cleaned)
         send(controller, { type: 'scenario', payload: result })
         send(controller, { type: 'done' })
