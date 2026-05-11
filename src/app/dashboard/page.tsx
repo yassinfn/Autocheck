@@ -186,10 +186,37 @@ function DashboardContent() {
     setExpandedModule(null)
 
     try {
+      let annonceText = trimmed
+      const sourceUrl = isUrl(trimmed) ? trimmed : undefined
+
+      if (isUrl(trimmed)) {
+        const scrapeRes = await fetch('/api/scrape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: trimmed }),
+        })
+
+        const scrapeData = await scrapeRes.json().catch(() => ({}))
+
+        if (!scrapeRes.ok) {
+          throw new Error(
+            (scrapeData as { message?: string; error?: string }).message ??
+            (scrapeData as { message?: string; error?: string }).error ??
+            "Impossible de récupérer le contenu de cette URL. Colle directement le texte de l'annonce dans le champ."
+          )
+        }
+
+        if (!(scrapeData as { text?: string }).text) {
+          throw new Error("Impossible de récupérer le contenu de cette URL. Colle directement le texte de l'annonce dans le champ.")
+        }
+
+        annonceText = (scrapeData as { text: string }).text
+      }
+
       const res = await fetch('/api/analyse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ annonce: trimmed }),
+        body: JSON.stringify({ annonce: annonceText }),
       })
 
       if (!res.ok) {
@@ -204,7 +231,7 @@ function DashboardContent() {
       await saveAnalysis({
         sessionId,
         analyse: result,
-        urlAnnonce: isUrl(trimmed) ? trimmed : undefined,
+        urlAnnonce: sourceUrl,
         stepReached: 1,
       })
 
