@@ -117,9 +117,19 @@ export default function InspectionOverlay({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'scenario', analyse: data }),
       })
-      const result = await res.json()
-      if (!res.ok) throw new Error(result.error)
-      const scenario = result as ScenarioResult
+      const text = await res.text()
+      let result: Record<string, unknown>
+      try {
+        result = JSON.parse(text)
+      } catch {
+        throw new Error(
+          res.status === 504
+            ? 'Délai dépassé — la génération du scénario prend trop de temps. Réessayez.'
+            : `Erreur serveur (${res.status}). Réessayez dans quelques secondes.`
+        )
+      }
+      if (!res.ok) throw new Error((result.error as string | undefined) ?? `Erreur ${res.status}`)
+      const scenario = result as unknown as ScenarioResult
       const states: VisiteStepState[] = scenario.steps.map(step => ({
         ...step,
         statut: 'pending',

@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       if (!analyse) {
         return NextResponse.json({ error: 'Données manquantes' }, { status: 400 })
       }
-      const text = await callClaude(buildScenarioPrompt(analyse), VISITE_SYSTEM, 8000)
+      const text = await callClaude(buildScenarioPrompt(analyse), VISITE_SYSTEM, 5000)
       const result = extractJSON<ScenarioResult>(text)
       return NextResponse.json(result)
     }
