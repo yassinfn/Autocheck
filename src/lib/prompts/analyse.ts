@@ -129,7 +129,16 @@ Réponds UNIQUEMENT avec ce JSON (textes en langue de l'annonce, montants sans e
     ],
     "totalObligatoiresMin": 0,
     "totalObligatoiresMax": 0
-  }
+  },
+  "signauxAlerte": [
+    {
+      "niveau": "eleve",
+      "categorie": "annonce",
+      "titre": "Exemple titre 8 mots max",
+      "explication": "1-2 phrases factuelles sur pourquoi c'est suspect.",
+      "action": "1 phrase concrète sur ce que l'acheteur doit faire."
+    }
+  ]
 }
 
 verdictType doit être exactement: "excellent" (80-100), "good" (60-79), "risky" (40-59), ou "avoid" (0-39)
@@ -161,6 +170,41 @@ ANOMALIES PRÉ-CALCULÉES : si des anomalies kilométriques apparaissent dans la
 
 ━━━ FIN RÈGLES AUTOVIZA ━━━
 ` : ''}
+━━━ SIGNAUX D'ALERTE À DÉTECTER (champ "signauxAlerte") ━━━
+
+Analyse l'annonce pour détecter des drapeaux rouges. Retourne 0 à 8 signaux.
+SOIS HONNÊTE : si tout va bien, retourne []. Ne force PAS la détection.
+niveau: "faible" | "modere" | "eleve" — categorie: "prix" | "annonce" | "incoherence" | "vendeur"
+titre: 8 mots max, percutant — explication: 1-2 phrases factuelles — action: 1 phrase concrète.
+
+CHECK 1 — PRIX ANORMALEMENT BAS (categorie: "prix")
+Estime le prix marché pour cette marque/modèle/année/km. Si prix demandé < 75% de ton estimation → signal "eleve".
+
+CHECK 2 — PRIX TROP ROND (categorie: "prix")
+Si prix = multiple parfait de 1000 ET contexte suspect (ex: véhicule récent à 10 000 €) → signal "faible".
+
+CHECK 3 — DESCRIPTION BÂCLÉE (categorie: "annonce")
+Si description < 80 mots OU aucune mention d'entretien/historique/factures → signal "modere".
+
+CHECK 4 — MOTS-CLÉS D'URGENCE (categorie: "annonce")
+Cherche: "urgent", "doit partir vite", "départ étranger", "cause déménagement", "cause divorce", "héritage", "saisie". Si présent → signal "modere".
+
+CHECK 5 — CT NON MENTIONNÉ (categorie: "annonce")
+Si véhicule > 4 ans ET aucune mention du contrôle technique → signal "eleve" (CT obligatoire pour vendre).
+
+CHECK 6 — KILOMÉTRAGE ATYPIQUE (categorie: "incoherence")
+km/an = kilométrage / (année actuelle − année véhicule).
+< 5 000 km/an → signal "modere" (compteur possiblement trafiqué ou très peu roulé).
+> 25 000 km/an → signal "modere" (usage commercial/intensif probable).
+
+CHECK 7 — INCOHÉRENCE VERSION/MOTORISATION (categorie: "incoherence")
+Si version annoncée (ex: "GTI", "Sport", "S-line") ne correspond pas aux caractéristiques techniques typiques → signal "eleve".
+
+CHECK 8 — PRO DÉGUISÉ EN PARTICULIER (categorie: "vendeur")
+Indices: "garantie 6 mois", "garantie 12 mois", "facture fournie", "reconditionné", "TVA récupérable", "société". Si présent ET vendeur se dit "particulier" → signal "eleve".
+
+━━━ FIN SIGNAUX D'ALERTE ━━━
+
 ANNONCE À ANALYSER:
 ${annonce}${historySection}`
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { AlertTriangle, ChevronRight } from 'lucide-react'
-import type { AnalyseResult, DepenseItem, Gravite, Frequence } from '@/types'
+import type { AnalyseResult, DepenseItem, Gravite, Frequence, NiveauAlerte } from '@/types'
 
 function normalize(item: unknown): string {
   if (typeof item === 'string') return item
@@ -11,6 +11,12 @@ function normalize(item: unknown): string {
     if (typeof o.title === 'string') return o.title
   }
   return String(item ?? '')
+}
+
+const NIVEAU_ALERTE_ICON: Record<NiveauAlerte, string> = {
+  faible: '🟢',
+  modere: '🟡',
+  eleve:  '🔴',
 }
 
 const GRAVITE_STYLE: Record<Gravite, string> = {
@@ -92,7 +98,35 @@ export default function AnalyseDetails({ analyse }: AnalyseDetailsProps) {
         )}
       </div>
 
-      {/* Section 2 — Points forts du modèle */}
+      {/* Section 2 — Signaux d'alerte */}
+      {analyse.signauxAlerte && analyse.signauxAlerte.length > 0 && (
+        <div className="rounded-xl border border-red-200 bg-red-50 overflow-hidden">
+          <div className="px-4 py-3 flex items-center gap-2">
+            <span className="text-base">🚩</span>
+            <h3 className="text-sm font-bold text-red-900">
+              Signaux d&apos;alerte détectés ({analyse.signauxAlerte.length})
+            </h3>
+          </div>
+          <div className="px-4 pb-4 space-y-2">
+            {analyse.signauxAlerte.map((signal, i) => (
+              <div key={i} className="bg-white rounded-xl border border-red-100 p-3">
+                <div className="flex items-start gap-2.5">
+                  <span className="shrink-0 text-base leading-none mt-0.5">
+                    {NIVEAU_ALERTE_ICON[signal.niveau] ?? '🔴'}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-900">{signal.titre}</p>
+                    <p className="text-sm text-slate-600 mt-1 leading-relaxed">{signal.explication}</p>
+                    <p className="text-sm text-indigo-700 font-medium mt-1.5">→ {signal.action}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Section 3 — Points forts du modèle (accordion) */}
       {pointsForts.length > 0 && (
         <AccordionSection title={`✓ Points forts du modèle (${pointsForts.length})`}>
           <ul className="space-y-1.5">

@@ -96,12 +96,24 @@ export interface DetectionResult {
   symbole: string
 }
 
+export type NiveauAlerte = 'faible' | 'modere' | 'eleve'
+export type CategorieAlerte = 'prix' | 'annonce' | 'incoherence' | 'vendeur'
+
+export interface SignalAlerte {
+  niveau: NiveauAlerte
+  categorie: CategorieAlerte
+  titre: string
+  explication: string
+  action: string
+}
+
 export interface AnalyseResult {
   detection: DetectionResult
   vehicule: VehiculeInfo
   score: ScoreResult
   reputation: ReputationResult
   depenses: DepensesResult
+  signauxAlerte?: SignalAlerte[]
 }
 
 // ─── Page 3 : Visite ─────────────────────────────────────────────────────────
