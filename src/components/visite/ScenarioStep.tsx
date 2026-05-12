@@ -18,6 +18,7 @@ interface ScenarioStepProps {
   onPhoto: (base64: string) => void
   onCommentaire: (text: string) => void
   onNext: () => void
+  onModifier: () => void
 }
 
 const CAT_COLORS: Record<string, string> = {
@@ -55,7 +56,7 @@ async function compressImage(file: File): Promise<string> {
 
 export default function ScenarioStep({
   step, stepNumber, totalSteps, treatedCount, isLast, isLastNiveau1, vehiculeKey,
-  onOK, onNOK, onPasse, onPhoto, onCommentaire, onNext,
+  onOK, onNOK, onPasse, onPhoto, onCommentaire, onNext, onModifier,
 }: ScenarioStepProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [showModal, setShowModal] = useState(false)
@@ -243,12 +244,20 @@ export default function ScenarioStep({
               }`}>
                 {step.statut === 'ok' ? '✓ OK' : step.statut === 'nok' ? '✗ NOK' : '⏭ Passé'}
               </div>
-              <button
-                onClick={onNext}
-                className="w-full py-3.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors"
-              >
-                {isLast ? 'Voir le récapitulatif →' : isLastNiveau1 ? 'Terminer le contrôle rapide →' : 'Étape suivante →'}
-              </button>
+              <div className="grid grid-cols-3 gap-2.5">
+                <button
+                  onClick={onModifier}
+                  className="col-span-1 py-3.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-semibold text-sm hover:bg-slate-50 transition-colors"
+                >
+                  ↺ Modifier
+                </button>
+                <button
+                  onClick={onNext}
+                  className="col-span-2 py-3.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors"
+                >
+                  {isLast ? 'Voir le récapitulatif →' : isLastNiveau1 ? 'Terminer le contrôle rapide →' : 'Étape suivante →'}
+                </button>
+              </div>
             </div>
           )}
         </div>

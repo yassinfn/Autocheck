@@ -387,6 +387,7 @@ export default function VisitePage() {
               onOK={() => handleVerdict('ok')}
               onNOK={() => handleVerdict('nok')}
               onPasse={() => handleVerdict('passe')}
+              onModifier={() => updateStep(currentIdx, { statut: 'pending' })}
               onPhoto={base64 => updateStep(currentIdx, { photo: base64 })}
               onCommentaire={text => updateStep(currentIdx, { commentaire: text })}
               onNext={handleNext}

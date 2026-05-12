@@ -320,6 +320,7 @@ export default function InspectionOverlay({
                 onOK={() => { updateStep(currentIdx, { statut: 'ok' }); handleNext() }}
                 onNOK={() => updateStep(currentIdx, { statut: 'nok' })}
                 onPasse={() => { updateStep(currentIdx, { statut: 'passe' }); handleNext() }}
+                onModifier={() => updateStep(currentIdx, { statut: 'pending' })}
                 onPhoto={base64 => updateStep(currentIdx, { photo: base64 })}
                 onCommentaire={text => updateStep(currentIdx, { commentaire: text })}
                 onNext={handleNext}
