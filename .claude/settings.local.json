@@ -9,7 +9,9 @@
       "Bash(git push *)",
       "Bash(npm install *)",
       "Bash(node -e \"require\\('jspdf'\\)\")",
-      "Bash(git commit -m 'fix: augmenter max_tokens scenario à 8000 + réduire longueur steps *)"
+      "Bash(git commit -m 'fix: augmenter max_tokens scenario à 8000 + réduire longueur steps *)",
+      "Bash(npm run *)",
+      "Bash(git ls-remote *)"
     ]
   }
 }
