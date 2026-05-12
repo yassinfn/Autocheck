@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       const universalSteps = getUniversalSteps(motorisationType)
       const universalIds = universalSteps.map(s => s.id)
 
-      const text = await callClaude(buildScenarioPrompt(analyse, universalIds), VISITE_SYSTEM, 2500)
+      const text = await callClaude(buildScenarioPrompt(analyse, universalIds), VISITE_SYSTEM, 3500)
 
       type RawResponse = {
         enrichissements?: Record<string, string>

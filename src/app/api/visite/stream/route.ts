@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
           },
           body: JSON.stringify({
             model: 'claude-sonnet-4-6',
-            max_tokens: 2500,
+            max_tokens: 3500,
             stream: true,
             system: VISITE_SYSTEM,
             messages: [{ role: 'user', content: buildScenarioPrompt(analyse, universalIds) }],

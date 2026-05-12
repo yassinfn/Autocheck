@@ -106,6 +106,12 @@ ${analyseGen.problemes_corriges_versions_suivantes.length
 
   return `Génère un complément de scénario d'inspection pour ce véhicule d'occasion.
 
+━━━ RÈGLE DE BRIÈVETÉ ABSOLUE ━━━
+Chaque texte produit doit être aussi court que possible. Pas d'introduction, pas de phrases qualifiantes. Va droit au point technique.
+❌ "Sur ce 1.6 D-4D co-développé BMW/PSA, localiser le couvre-culasse et inspecter les abords de la chaîne de distribution côté droit : toute trace d'huile ou suintement est un signal d'alarme prioritaire." (INTERDIT — 40+ mots)
+✅ "Chaîne de distribution côté droit : vérifier suintement d'huile au couvre-culasse — faiblesse connue de cette motorisation." (OK — 20 mots)
+La verbosité fait planter la génération.
+
 VÉHICULE : ${vehicule.marque} ${vehicule.modele} ${vehicule.annee} — ${vehicule.motorisation} ${vehicule.boite}
 KILOMÉTRAGE : ${vehicule.kilometrage.toLocaleString()} km | ÂGE : ${age} an${age > 1 ? 's' : ''}
 PRIX : ${vehicule.prix.toLocaleString()} ${detection.symbole}
@@ -126,17 +132,22 @@ ${universalList}
 ━━━ CE QUE TU DOIS GÉNÉRER ━━━
 
 1. ENRICHISSEMENTS (objet "enrichissements") :
-   - 0 à 9 entrées maximum
+   - MAXIMUM 3 entrées — choisis les 3 IDs où tu as l'info LA PLUS spécifique à ce véhicule
+   - Si moins de 3 infos vraiment spécifiques, mets moins (0, 1 ou 2)
    - IMPORTANT : utilise UNIQUEMENT les IDs listés dans la section POINTS UNIVERSELS DÉJÀ COUVERTS ci-dessus, à la lettre exacte. Tout ID non listé sera ignoré par le système.
-   - Valeur = 1 à 2 phrases de contexte ULTRA spécifique à ce véhicule (modèle, génération, kilométrage)
-   - Si rien de spécifique pour un ID, NE PAS l'inclure du tout
-   - ✅ Bon : "Sur cette génération, contrôler l'usure intérieure des pneus avant — défaut connu de parallélisme progressif."
-   - ✅ Bon : "Diesel à plus de 200 000 km : guetter une fumée bleue prolongée après démarrage, signe d'usure turbo."
-   - ❌ Mauvais : "Bien vérifier la carrosserie." (générique, pas d'info nouvelle)
-   - ❌ Mauvais : "Faire attention à la rouille." (déjà dans le quoi_chercher universel)
+   - Chaque valeur : MAXIMUM 40 MOTS (compte-les) — pas d'introduction type "Sur ce modèle..." ou "Pour cette génération...", entre immédiatement dans le sujet
+   - ✅ "Chaîne de distribution côté droit : vérifier suintement d'huile au couvre-culasse — faiblesse connue de cette motorisation."
+   - ✅ "Diesel >200 000 km : fumée bleue prolongée après démarrage = usure turbo."
+   - ❌ "Sur ce 1.6 D-4D co-développé BMW/PSA, localiser le couvre-culasse et inspecter les abords..." (trop long)
+   - ❌ "Bien vérifier la carrosserie." (générique)
 
 2. STEPS SPÉCIFIQUES (tableau "steps_specifiques") :
-   - Exactement 3 à 5 étapes
+   - 3 à 5 étapes — vise 3 ou 4, pas 5 par défaut
+   - titre : MAXIMUM 6 mots
+   - instruction : MAXIMUM 30 mots
+   - quoi_chercher : 2 à 3 éléments, MAXIMUM 15 mots chacun
+   - si_nok : MAXIMUM 25 mots
+   - image_query / youtube_query : 4 à 6 mots max
    - Couvrent UNIQUEMENT : problèmes connus du modèle (FAP, DSG, EGR, distribution, turbo...), particularités de cette génération, seuils de kilométrage critique
    - NE PAS couvrir : carrosserie, pneus, fluides généraux, démarrage standard, habitacle, dessous standard, essai routier (couverts par les universels)
    - NE PAS couvrir : historique, CT, factures, nombre de propriétaires (Module 2)
