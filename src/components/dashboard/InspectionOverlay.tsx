@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { X, Pause } from 'lucide-react'
+import { X, Pause, ChevronLeft } from 'lucide-react'
 import Spinner from '@/components/ui/Spinner'
 import ScenarioIntro from '@/components/visite/ScenarioIntro'
 import ScenarioStep from '@/components/visite/ScenarioStep'
@@ -242,6 +242,16 @@ export default function InspectionOverlay({
           >
             <X size={18} className="text-slate-600" />
           </button>
+          {phase === 'step' && currentIdx > 0 && (
+            <button
+              type="button"
+              onClick={() => setCurrentIdx(prev => Math.max(0, prev - 1))}
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
+              aria-label="Étape précédente"
+            >
+              <ChevronLeft size={18} className="text-slate-600" />
+            </button>
+          )}
           <span className="font-semibold text-slate-900 flex-1 text-sm">Inspection sur place</span>
           {progressStr && (
             <span className="text-xs text-slate-500 font-medium">{progressStr}</span>
@@ -306,9 +316,10 @@ export default function InspectionOverlay({
                 isLast={currentIdx === stepStates.length - 1}
                 isLastNiveau1={currentIdx === lastNiveau1Idx && niveau2Steps.length > 0}
                 vehiculeKey={vehiculeKey}
-                onOK={() => updateStep(currentIdx, { statut: 'ok' })}
+                treatedCount={treated}
+                onOK={() => { updateStep(currentIdx, { statut: 'ok' }); handleNext() }}
                 onNOK={() => updateStep(currentIdx, { statut: 'nok' })}
-                onPasse={() => updateStep(currentIdx, { statut: 'passe' })}
+                onPasse={() => { updateStep(currentIdx, { statut: 'passe' }); handleNext() }}
                 onPhoto={base64 => updateStep(currentIdx, { photo: base64 })}
                 onCommentaire={text => updateStep(currentIdx, { commentaire: text })}
                 onNext={handleNext}

@@ -8,6 +8,7 @@ interface ScenarioStepProps {
   step: VisiteStepState
   stepNumber: number
   totalSteps: number
+  treatedCount: number
   isLast: boolean
   isLastNiveau1?: boolean
   vehiculeKey: string
@@ -53,7 +54,7 @@ async function compressImage(file: File): Promise<string> {
 }
 
 export default function ScenarioStep({
-  step, stepNumber, totalSteps, isLast, isLastNiveau1, vehiculeKey,
+  step, stepNumber, totalSteps, treatedCount, isLast, isLastNiveau1, vehiculeKey,
   onOK, onNOK, onPasse, onPhoto, onCommentaire, onNext,
 }: ScenarioStepProps) {
   const fileRef = useRef<HTMLInputElement>(null)
@@ -94,7 +95,7 @@ export default function ScenarioStep({
         <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
           <div
             className="h-full bg-indigo-600 rounded-full transition-all duration-500"
-            style={{ width: `${((stepNumber - 1) / totalSteps) * 100}%` }}
+            style={{ width: `${(treatedCount / totalSteps) * 100}%` }}
           />
         </div>
       </div>

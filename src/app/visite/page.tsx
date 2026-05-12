@@ -380,6 +380,7 @@ export default function VisitePage() {
               step={stepStates[currentIdx]}
               stepNumber={currentIdx + 1}
               totalSteps={stepStates.length}
+              treatedCount={stepStates.filter(s => s.statut !== 'pending').length}
               isLast={currentIdx === stepStates.length - 1}
               isLastNiveau1={currentIdx === lastNiveau1Idx && niveau2Steps.length > 0}
               vehiculeKey={vehiculeKey}
