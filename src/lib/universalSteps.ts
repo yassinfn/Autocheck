@@ -250,7 +250,7 @@ const UNIVERSAL_STEPS_ELECTRIQUE: VisiteStep[] = [
   },
   {
     id: 'univ-5-batterie-traction',
-    categorie: 'Points spécifiques',
+    categorie: 'Compartiment moteur',
     titre: 'Batterie de traction — santé et autonomie',
     instruction: 'Dans le menu de bord, cherchez le State of Health (SoH) si disponible. Vérifiez l\'autonomie affichée à charge élevée et comparez avec les spécifications du véhicule neuf.',
     quoi_chercher: [
@@ -382,7 +382,7 @@ export function applyEnrichments(steps: VisiteStep[], enrichments: UniversalEnri
     if (!enrichment) return step
     return {
       ...step,
-      instruction: `${step.instruction}\n\n📍 Spécifique à ce véhicule : ${enrichment}`,
+      quoi_chercher: [...step.quoi_chercher, `📍 Spécifique à ce véhicule : ${enrichment}`],
     }
   })
 }
