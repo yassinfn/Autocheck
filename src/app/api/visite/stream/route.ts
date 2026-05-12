@@ -3,7 +3,8 @@ import { NextRequest } from 'next/server'
 export const runtime = 'edge'
 import { extractJSON } from '@/lib/claude'
 import { VISITE_SYSTEM, buildScenarioPrompt } from '@/lib/prompts/visite'
-import type { AnalyseResult, ScenarioResult } from '@/types'
+import { getUniversalSteps, detectMotorisation, applyEnrichments } from '@/lib/universalSteps'
+import type { AnalyseResult, ScenarioResult, VisiteStep } from '@/types'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
@@ -24,6 +25,10 @@ export async function POST(req: NextRequest) {
           return
         }
 
+        const motorisationType = detectMotorisation(analyse.vehicule.motorisation)
+        const universalSteps = getUniversalSteps(motorisationType)
+        const universalIds = universalSteps.map(s => s.id)
+
         const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
@@ -33,10 +38,10 @@ export async function POST(req: NextRequest) {
           },
           body: JSON.stringify({
             model: 'claude-sonnet-4-6',
-            max_tokens: 8000,
+            max_tokens: 2500,
             stream: true,
             system: VISITE_SYSTEM,
-            messages: [{ role: 'user', content: buildScenarioPrompt(analyse) }],
+            messages: [{ role: 'user', content: buildScenarioPrompt(analyse, universalIds) }],
           }),
         })
 
@@ -83,12 +88,43 @@ export async function POST(req: NextRequest) {
         if (cleaned.length < 100) {
           throw new Error('Réponse Claude trop courte, réessayez.')
         }
+
+        console.log('[visite-stream] endsWith }?:', cleaned.trimEnd().endsWith('}'))
+
         if (!cleaned.trimEnd().endsWith('}')) {
           throw new Error(`Réponse Claude tronquée (${cleaned.length} chars, finit par: "${cleaned.slice(-30)}"). Réessayez.`)
         }
 
-        const result = extractJSON<ScenarioResult>(cleaned)
-        send(controller, { type: 'scenario', payload: result })
+        type RawResponse = {
+          enrichissements?: Record<string, string>
+          steps_specifiques?: unknown[]
+        }
+        const raw = extractJSON<RawResponse>(cleaned)
+        const enrichissements: Record<string, string> = raw.enrichissements ?? {}
+        const stepsSpecifiques: VisiteStep[] = (Array.isArray(raw.steps_specifiques) ? raw.steps_specifiques : [])
+          .map((s) => {
+            const step = s as Partial<VisiteStep>
+            return {
+              ...step,
+              niveau: (step.niveau === 1 || step.niveau === 2) ? step.niveau : 2,
+              quoi_chercher: Array.isArray(step.quoi_chercher) ? step.quoi_chercher : [],
+            } as VisiteStep
+          })
+
+        const enrichedUniversals = applyEnrichments(universalSteps, enrichissements)
+
+        // Tri stable par niveau (niveau 1 avant niveau 2, ordre relatif préservé)
+        const allSteps: VisiteStep[] = [...enrichedUniversals, ...stepsSpecifiques]
+          .sort((a, b) => (a.niveau ?? 1) - (b.niveau ?? 1))
+
+        console.log('[visite-stream] motorisationType:', motorisationType)
+        console.log('[visite-stream] universalSteps count:', universalSteps.length)
+        console.log('[visite-stream] enrichissements keys:', Object.keys(enrichissements))
+        console.log('[visite-stream] stepsSpecifiques count:', stepsSpecifiques.length)
+        console.log('[visite-stream] total steps:', allSteps.length)
+
+        const scenario: ScenarioResult = { steps: allSteps }
+        send(controller, { type: 'scenario', payload: scenario })
         send(controller, { type: 'done' })
       } catch (err) {
         send(controller, {
