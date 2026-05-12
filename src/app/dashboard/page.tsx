@@ -5,9 +5,10 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronRight, Check, Lock, Scale, AlertTriangle, RotateCcw, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { saveAnalysis, getOrCreateSessionId, clearRowId, restoreRowId } from '@/lib/saveAnalysis'
-import type { AnalyseResult, ContactQuestionsResult, ContactVerdict, VisiteData } from '@/types'
+import type { AnalyseResult, ContactQuestionsResult, ContactVerdict, VisiteData, DecisionFinale } from '@/types'
 import VerdictBlock from '@/components/contact/VerdictBlock'
 import InspectionOverlay from '@/components/dashboard/InspectionOverlay'
+import DecisionBlock from '@/components/dashboard/DecisionBlock'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -141,6 +142,11 @@ function DashboardContent() {
   const [contactError, setContactError] = useState<string | null>(null)
   const [showDecisionHint, setShowDecisionHint] = useState(false)
 
+  // Module 4 — Décision finale
+  const [decision, setDecision] = useState<DecisionFinale | null>(null)
+  const [decisionLoading, setDecisionLoading] = useState(false)
+  const [decisionError, setDecisionError] = useState<string | null>(null)
+
   // ── Load existing data on mount ──────────────────────────────────────────────
   useEffect(() => {
     const idFromUrl = searchParams.get('id')
@@ -215,6 +221,12 @@ function DashboardContent() {
       }
     })()
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── Hydrate decision from localStorage on mount ──────────────────────────────
+  useEffect(() => {
+    const saved = localStorage.getItem('autocheck_decision')
+    if (saved) try { setDecision(JSON.parse(saved) as DecisionFinale) } catch {}
   }, [])
 
   // ── Auto-generate questions whenever a fresh analysis lands ──────────────────
@@ -325,11 +337,13 @@ function DashboardContent() {
     setContactError(null)
     setShowDecisionHint(false)
     setVisite(null)
+    setDecision(null)
     localStorage.removeItem('autocheck_questions')
     localStorage.removeItem('autocheck_contact')
     localStorage.removeItem('autocheck_contact_responses')
     localStorage.removeItem('autocheck_contact_skipped')
     localStorage.removeItem('autocheck_visite')
+    localStorage.removeItem('autocheck_decision')
 
     try {
       let annonceText = trimmed
@@ -435,13 +449,53 @@ function DashboardContent() {
     setContactError(null)
     setShowDecisionHint(false)
     setVisite(null)
+    setDecision(null)
     setInspectionOpen(false)
     localStorage.removeItem('autocheck_questions')
     localStorage.removeItem('autocheck_contact')
     localStorage.removeItem('autocheck_contact_responses')
     localStorage.removeItem('autocheck_contact_skipped')
     localStorage.removeItem('autocheck_visite')
+    localStorage.removeItem('autocheck_decision')
     router.replace('/dashboard')
+  }
+
+  async function handleLancerDecision(forceRefresh = false) {
+    if (!analyse) return
+    if (!forceRefresh && decision) {
+      setExpandedModule(4)
+      return
+    }
+    setDecisionLoading(true)
+    setDecisionError(null)
+    setExpandedModule(4)
+    try {
+      const res = await fetch('/api/decision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          analyse,
+          visite: visite ?? undefined,
+          contactVerdict: contactVerdict ?? undefined,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error((data as { error?: string }).error ?? 'Erreur')
+      const result = data as DecisionFinale
+      setDecision(result)
+      localStorage.setItem('autocheck_decision', JSON.stringify(result))
+      await saveAnalysis({ sessionId: getOrCreateSessionId(), decision: result, stepReached: 4 })
+    } catch (err) {
+      setDecisionError(err instanceof Error ? err.message : 'Erreur lors de la génération')
+    } finally {
+      setDecisionLoading(false)
+    }
+  }
+
+  function handleRecalculer() {
+    setDecision(null)
+    localStorage.removeItem('autocheck_decision')
+    handleLancerDecision(true)
   }
 
   // ── Derived display values ────────────────────────────────────────────────────
@@ -479,7 +533,13 @@ function DashboardContent() {
     ? 'done'
     : 'active'
 
-  const module4Status: ModuleStatus = visitDone ? 'active' : 'locked'
+  const labelMap: Record<string, string> = { acheter: 'Achat recommandé', negocier: 'Négociation', refuser: 'Déconseillé' }
+  const module4Status: ModuleStatus = !analyse ? 'locked' : decision ? 'done' : 'active'
+  const module4Subtitle = !analyse
+    ? "Disponible après l'analyse"
+    : decision
+    ? `Score ${decision.scoreGlobal}/100 · ${labelMap[decision.decision] ?? decision.decision}`
+    : "Recommandation IA basée sur toutes les étapes"
 
   const module3Subtitle = visitDone
     ? `${visitSteps.length} étapes · ${visitNok} problème${visitNok > 1 ? 's' : ''} détecté${visitNok > 1 ? 's' : ''}`
@@ -964,11 +1024,24 @@ function DashboardContent() {
             icon={<Scale size={16} className={module4Status !== 'locked' ? 'text-blue-600' : 'text-slate-400'} />}
             iconBg={module4Status !== 'locked' ? 'bg-blue-100' : 'bg-slate-100'}
             title="Décision finale"
-            subtitle="Disponible dès que l'inspection est complétée"
+            subtitle={module4Subtitle}
             status={module4Status}
-            expanded={false}
+            expanded={expandedModule === 4}
             onToggle={handleToggle}
-          />
+          >
+            {analyse && (
+              <DecisionBlock
+                analyse={analyse}
+                contactVerdict={contactVerdict}
+                visite={visite}
+                decision={decision}
+                loading={decisionLoading}
+                error={decisionError}
+                onLancer={() => handleLancerDecision()}
+                onRecalculer={handleRecalculer}
+              />
+            )}
+          </Module>
         </div>
 
         {/* ── BOTTOM BUTTONS ────────────────────────────────────────────────── */}
