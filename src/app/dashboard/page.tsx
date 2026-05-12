@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronRight, Check, Lock, Scale, AlertTriangle, RotateCcw, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { saveAnalysis, getOrCreateSessionId, clearRowId, restoreRowId } from '@/lib/saveAnalysis'
-import type { AnalyseResult, ContactQuestionsResult, ContactVerdict, VisiteData, DecisionFinale } from '@/types'
+import type { AnalyseResult, ContactQuestionsResult, ContactVerdict, VisiteData, DecisionFinale, HistoryData } from '@/types'
 import VerdictBlock from '@/components/contact/VerdictBlock'
 import InspectionOverlay from '@/components/dashboard/InspectionOverlay'
 import DecisionBlock from '@/components/dashboard/DecisionBlock'
@@ -349,6 +349,7 @@ function DashboardContent() {
     try {
       let annonceText = trimmed
       const sourceUrl = isUrl(trimmed) ? trimmed : undefined
+      let historyData: HistoryData | undefined = undefined
 
       if (isUrl(trimmed)) {
         const scrapeRes = await fetch('/api/scrape', {
@@ -372,12 +373,13 @@ function DashboardContent() {
         }
 
         annonceText = (scrapeData as { text: string }).text
+        historyData = (scrapeData as { historyData?: HistoryData }).historyData
       }
 
       const res = await fetch('/api/analyse/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ annonce: annonceText, sourceUrl }),
+        body: JSON.stringify({ annonce: annonceText, sourceUrl, historyData }),
       })
 
       if (!res.ok || !res.body) {
