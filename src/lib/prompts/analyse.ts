@@ -143,6 +143,22 @@ Réponds UNIQUEMENT avec ce JSON (textes en langue de l'annonce, montants sans e
 
 verdictType doit être exactement: "excellent" (80-100), "good" (60-79), "risky" (40-59), ou "avoid" (0-39)
 Le total du score doit être la somme des points de chaque critère.
+
+━━━ PÉRIMÈTRE DES DEUX SECTIONS D'ALERTES — RÈGLE DE NON-DUPLICATION ━━━
+
+\`pointsAttention\` : vigilances MÉCANIQUES, TECHNIQUES ou d'ENTRETIEN sur le véhicule lui-même.
+Exemples → "Distribution à vérifier à ce kilométrage", "Moteur connu pour problème de FAP", "Suspension à inspecter à 150 000 km".
+
+\`signauxAlerte\` : drapeaux rouges détectables dans l'ANNONCE elle-même — prix louche, infos manquantes, mots-clés suspects, incohérences administratives, vendeur douteux. C'est de la détection d'ARNAQUE ou de RISQUE TRANSACTIONNEL, pas de risque mécanique.
+
+Les deux sections sont DISJOINTES. Si un risque peut tomber dans les deux, choisis UNE SEULE section selon la nature dominante :
+- "Pas de mention du CT" → signauxAlerte (problème admin/transactionnel)
+- "FAP à inspecter à 150 000 km" → pointsAttention (problème technique)
+- "Incohérence puissance fiscale" → signauxAlerte (problème admin)
+- "Distribution chaîne fragile à ce km" → pointsAttention (problème mécanique)
+- "Peu de photos" → signauxAlerte (déficience de l'annonce, pas du véhicule)
+
+━━━ FIN RÈGLE NON-DUPLICATION ━━━
 ${historySection ? `
 ━━━ ANALYSE OBLIGATOIRE DU RAPPORT AUTOVIZA ━━━
 
@@ -171,6 +187,10 @@ ANOMALIES PRÉ-CALCULÉES : si des anomalies kilométriques apparaissent dans la
 ━━━ FIN RÈGLES AUTOVIZA ━━━
 ` : ''}
 ━━━ SIGNAUX D'ALERTE À DÉTECTER (champ "signauxAlerte") ━━━
+
+RÈGLE D'EXCLUSIVITÉ : tout ce qui figure dans \`signauxAlerte\` ne doit PAS figurer dans \`pointsAttention\` (et inversement).
+- L'info concerne l'annonce / le vendeur / la transaction → signauxAlerte
+- L'info concerne le véhicule / la mécanique / l'entretien → pointsAttention
 
 Analyse l'annonce pour détecter des drapeaux rouges. Retourne 0 à 8 signaux.
 SOIS HONNÊTE : si tout va bien, retourne []. Ne force PAS la détection.
