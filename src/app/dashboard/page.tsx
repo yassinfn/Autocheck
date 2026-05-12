@@ -574,18 +574,10 @@ function DashboardContent() {
       {/* ── HEADER ──────────────────────────────────────────────────────────── */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
-          <a href="/analyse" className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shrink-0">
+          <a href="/dashboard" className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shrink-0">
             <span className="text-white font-bold text-sm">AC</span>
           </a>
           <span className="font-bold text-slate-900">AutoCheck</span>
-          <div className="ml-auto flex items-center gap-4">
-            <a href="/historique" className="text-xs text-slate-500 hover:text-slate-700 transition-colors">
-              Historique
-            </a>
-            <button type="button" className="text-xs text-slate-500 hover:text-slate-700 transition-colors">
-              PDF
-            </button>
-          </div>
         </div>
       </header>
 
