@@ -1,15 +1,11 @@
 'use client'
 
-import VideoMoteur from '@/components/visite/VideoMoteur'
-import type { VisiteStepState, VideoAnalyseResult, AnalyseResult, ContactVerdict } from '@/types'
+import type { VisiteStepState, AnalyseResult, ContactVerdict } from '@/types'
 
 interface ScenarioRecapProps {
   steps: VisiteStepState[]
   marque: string
   modele: string
-  langue: string
-  videoAnalyse?: VideoAnalyseResult
-  onVideoAnalyse: (result: VideoAnalyseResult) => void
   onValidate: () => void
   onRestart?: () => void
   analyse?: AnalyseResult
@@ -26,7 +22,7 @@ function groupByCategorie(steps: VisiteStepState[]): Map<string, VisiteStepState
 }
 
 export default function ScenarioRecap({
-  steps, marque, modele, langue, videoAnalyse, onVideoAnalyse, onValidate, onRestart,
+  steps, marque, modele, onValidate, onRestart,
 }: ScenarioRecapProps) {
   const ok    = steps.filter(s => s.statut === 'ok').length
   const nok   = steps.filter(s => s.statut === 'nok').length
@@ -132,13 +128,6 @@ export default function ScenarioRecap({
           </div>
         </div>
       )}
-
-      {/* Video moteur */}
-      <VideoMoteur
-        langue={langue}
-        onAnalyse={onVideoAnalyse}
-        existingResult={videoAnalyse}
-      />
 
       {/* Actions */}
       <div className="space-y-3 pb-4">

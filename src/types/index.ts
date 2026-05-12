@@ -150,22 +150,9 @@ export interface ScenarioResult {
   steps: VisiteStep[]
 }
 
-export type VerdictMoteur = 'sain' | 'suspect' | 'critique'
-
-export interface VideoAnalyseResult {
-  verdict_visuel: VerdictMoteur
-  detail_visuel: string
-  verdict_sonore: VerdictMoteur
-  detail_sonore: string
-  verdict_global: VerdictMoteur
-  recommandations: string
-  analyse_date: string
-}
-
 export interface VisiteData {
   // New guided scenario format
   steps?: VisiteStepState[]
-  videoAnalyse?: VideoAnalyseResult
   // Legacy checklist format (old Supabase rows)
   items?: ChecklistItemState[]
   photoAnalyses?: string[]

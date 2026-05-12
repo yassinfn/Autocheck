@@ -13,7 +13,6 @@ import type {
   ScenarioResult,
   VisiteStepState,
   VisiteData,
-  VideoAnalyseResult,
   ContactVerdict,
 } from '@/types'
 
@@ -41,7 +40,6 @@ export default function InspectionOverlay({
   const [phase, setPhase] = useState<Phase>('loading')
   const [stepStates, setStepStates] = useState<VisiteStepState[]>([])
   const [currentIdx, setCurrentIdx] = useState(0)
-  const [videoAnalyse, setVideoAnalyse] = useState<VideoAnalyseResult | undefined>()
   const [error, setError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -74,14 +72,14 @@ export default function InspectionOverlay({
       try {
         const visitData = JSON.parse(saved) as VisiteData
         if (visitData.steps?.length) {
-          resumeFromSteps(visitData.steps, visitData.videoAnalyse)
+          resumeFromSteps(visitData.steps)
           return
         }
       } catch {}
     }
 
     if (initialVisite?.steps?.length) {
-      resumeFromSteps(initialVisite.steps, initialVisite.videoAnalyse)
+      resumeFromSteps(initialVisite.steps)
       return
     }
 
@@ -94,9 +92,8 @@ export default function InspectionOverlay({
     scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
   }, [currentIdx, phase])
 
-  function resumeFromSteps(steps: VisiteStepState[], vAnalyse?: VideoAnalyseResult) {
+  function resumeFromSteps(steps: VisiteStepState[]) {
     setStepStates(steps)
-    if (vAnalyse) setVideoAnalyse(vAnalyse)
     const treated = steps.filter(s => s.statut !== 'pending').length
     if (treated === steps.length) {
       setPhase('recap')
@@ -170,7 +167,7 @@ export default function InspectionOverlay({
   function updateStep(idx: number, patch: Partial<VisiteStepState>) {
     const updated = stepStates.map((s, i) => (i === idx ? { ...s, ...patch } : s))
     setStepStates(updated)
-    localStorage.setItem('autocheck_visite', JSON.stringify({ steps: updated, videoAnalyse }))
+    localStorage.setItem('autocheck_visite', JSON.stringify({ steps: updated }))
   }
 
   function handleNext() {
@@ -192,14 +189,14 @@ export default function InspectionOverlay({
   }
 
   function handleSuspend() {
-    const visiteData: VisiteData = { steps: stepStates, videoAnalyse }
+    const visiteData: VisiteData = { steps: stepStates }
     localStorage.setItem('autocheck_visite', JSON.stringify(visiteData))
     saveAnalysis({ sessionId: getOrCreateSessionId(), visite: visiteData }).catch(() => {})
     onClose()
   }
 
   async function handleComplete() {
-    const visiteData: VisiteData = { steps: stepStates, videoAnalyse }
+    const visiteData: VisiteData = { steps: stepStates }
     localStorage.setItem('autocheck_visite', JSON.stringify(visiteData))
     localStorage.removeItem('autocheck_decision')
     await saveAnalysis({ sessionId: getOrCreateSessionId(), visite: visiteData, stepReached: 3 })
@@ -344,9 +341,6 @@ export default function InspectionOverlay({
                 steps={stepStates}
                 marque={analyse.vehicule.marque}
                 modele={analyse.vehicule.modele}
-                langue={analyse.detection.langue}
-                videoAnalyse={videoAnalyse}
-                onVideoAnalyse={setVideoAnalyse}
                 onValidate={handleComplete}
                 onRestart={handleRestart}
                 analyse={analyse}
