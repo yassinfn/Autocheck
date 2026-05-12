@@ -59,7 +59,7 @@ function buildHistorySection(h: HistoryData): string {
     kmAnomalies.forEach(a => lines.push(a))
   }
 
-  if (h.resume) lines.push(`\nDétail:\n${h.resume.slice(0, 1200)}`)
+  if (h.resume) lines.push(`\nDétail:\n${h.resume.slice(0, 3000)}`)
   lines.push('=== FIN RAPPORT AUTOVIZA ===')
   return lines.join('\n')
 }

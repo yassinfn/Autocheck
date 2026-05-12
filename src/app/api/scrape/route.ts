@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import type { HistoryData, KmReleve } from '@/types'
+import { extractAutovizaUrl, fetchAutovizaReport, formatAutovizaForPrompt } from '@/lib/autoviza'
+import type { AutovizaData, HistoryData, KmReleve } from '@/types'
 
 // ── User agents ──────────────────────────────────────────────────────────────
 
@@ -27,43 +28,6 @@ function htmlToText(html: string): string {
     .replace(/&#39;/g, "'")
     .replace(/\s{2,}/g, ' ')
     .trim()
-}
-
-function findAutovizaUrl(html: string): string | null {
-  const urlMatch = html.match(/https?:\/\/(?:www\.)?autoviza\.fr\/report[^\s"'<>&]*/i)
-  if (urlMatch) return urlMatch[0]
-  const pathMatch = html.match(/autoviza\.fr\/report\/([A-Z0-9-]+)/i)
-  if (pathMatch) return `https://www.autoviza.fr/report/${pathMatch[1]}`
-  return null
-}
-
-function parseAutovizaData(text: string): HistoryData {
-  const resume = text.slice(0, 3000)
-
-  const propMatch = text.match(/(\d+)\s*propriétaire/i)
-  const proprietaires = propMatch ? parseInt(propMatch[1]) : undefined
-
-  const relevesKm: KmReleve[] = []
-  const kmPattern =
-    /(\d[\d\s]{1,8})\s*km[\s\S]{0,60}?(\d{2}[/\-]\d{2}[/\-]\d{2,4}|\d{2}[/\-]\d{4}|\w+\.?\s+\d{4}|\d{4})/gi
-  let kmMatch
-  while ((kmMatch = kmPattern.exec(text)) !== null && relevesKm.length < 15) {
-    const km = parseInt(kmMatch[1].replace(/\s/g, ''))
-    if (km >= 1000 && km <= 1_500_000) {
-      const releve: KmReleve = { km, date: kmMatch[2].trim() }
-      if (!relevesKm.some(r => r.km === km)) relevesKm.push(releve)
-    }
-  }
-  relevesKm.sort((a, b) => a.km - b.km)
-
-  const immatriculationVerifiee =
-    /immatriculation\s*v[eé]rifi|v[eé]rifi[eé]\s*immatriculation|plaque.*v[eé]rifi|enregistr[eé]\s*SIV/i.test(text)
-
-  const anomalie =
-    /anomalie|incoh[eé]rence|kilom[eé]trage\s*suspect|kilom[eé]trage\s*manip|compteur\s*alté/i.test(text)
-  const coherenceKm = !anomalie
-
-  return { proprietaires, relevesKm, immatriculationVerifiee, coherenceKm, resume }
 }
 
 // ── Site configuration ────────────────────────────────────────────────────────
@@ -246,20 +210,25 @@ async function fetchWithBrowserless(targetUrl: string, config: SiteConfig): Prom
 
 // ── Autoviza ─────────────────────────────────────────────────────────────────
 
-async function fetchAutoviza(
-  url: string
-): Promise<{ data: HistoryData } | { blocked: true } | null> {
-  const html = await fetchWithBrowserless(url, { type: 'js-light', waitForTimeout: 6000 })
-  if (html) {
-    return { data: parseAutovizaData(htmlToText(html)) }
-  }
-  try {
-    const res = await fetch(url, { headers: STATIC_HEADERS, signal: AbortSignal.timeout(10_000) })
-    if (res.status === 403 || res.status === 401) return { blocked: true }
-    if (!res.ok) return null
-    return { data: parseAutovizaData(htmlToText(await res.text())) }
-  } catch {
-    return null
+function autovizaToHistoryData(data: AutovizaData): HistoryData {
+  const proprietaires = data.synthese.nombreProprietaires
+    ? parseInt(data.synthese.nombreProprietaires, 10)
+    : undefined
+
+  const relevesKm: KmReleve[] = data.historique
+    .filter(e => e.km)
+    .map(e => ({
+      km: parseInt(e.km!.replace(/[^\d]/g, ''), 10),
+      date: e.date,
+    }))
+    .filter(r => !isNaN(r.km) && r.km >= 1000 && r.km <= 1_500_000)
+
+  return {
+    proprietaires,
+    relevesKm,
+    immatriculationVerifiee: data.synthese.controleExistenceOk ?? false,
+    coherenceKm: true, // TODO V2: validation chronologique des relevés (km croissants dans le temps)
+    resume: formatAutovizaForPrompt(data),
   }
 }
 
@@ -333,27 +302,20 @@ export async function POST(req: NextRequest) {
 
     // ── Direct Autoviza URL ─────────────────────────────────────────────────
     if (hostname.includes('autoviza.fr')) {
-      const result = await fetchAutoviza(url)
-      if (!result) {
+      const autovizaData = await fetchAutovizaReport(url)
+      if (!autovizaData) {
         return NextResponse.json(
           { error: 'Impossible de récupérer le rapport Autoviza' },
           { status: 502 }
         )
       }
-      if ('blocked' in result) {
-        return NextResponse.json(
-          {
-            error: 'blocked',
-            message: "Le rapport Autoviza bloque l'accès automatique. Copiez le contenu de la page et collez-le dans l'onglet Texte.",
-          },
-          { status: 403 }
-        )
-      }
+      const historyData = autovizaToHistoryData(autovizaData)
       return NextResponse.json({
-        text: result.data.resume,
+        text: historyData.resume,
         hasHistory: true,
         historySource: 'autoviza',
-        historyData: result.data,
+        historyData,
+        autoviza: autovizaData,
       })
     }
 
@@ -431,16 +393,17 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Autoviza detection (all sites) ──────────────────────────────────────
-    const autovizaUrl = findAutovizaUrl(html)
+    const autovizaUrl = extractAutovizaUrl(html)
 
     if (autovizaUrl) {
-      const autovizaResult = await fetchAutoviza(autovizaUrl)
-      if (autovizaResult && !('blocked' in autovizaResult)) {
+      const autovizaData = await fetchAutovizaReport(autovizaUrl)
+      if (autovizaData) {
         return NextResponse.json({
           text: annonceText,
           hasHistory: true,
           historySource: 'autoviza',
-          historyData: autovizaResult.data,
+          historyData: autovizaToHistoryData(autovizaData),
+          autoviza: autovizaData,
           lowConfidence,
         })
       }

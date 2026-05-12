@@ -216,3 +216,36 @@ export interface ContactVerdict {
   }
   recommandation: string
 }
+
+// ─── Rapport Autoviza ────────────────────────────────────────────────────────
+
+export interface AutovizaSinistre {
+  typeDeSinistre?: string
+  coutEstime?: string
+  zoneDuChoc?: string
+}
+
+export interface AutovizaEvenementTimeline {
+  date: string
+  km?: string
+  titre: string
+  description?: string
+  sinistre?: AutovizaSinistre
+}
+
+export interface AutovizaUsagePro {
+  type: string
+  detecte: boolean
+}
+
+export interface AutovizaData {
+  synthese: {
+    nombreProprietaires?: string
+    controleExistenceOk?: boolean
+    relevesKilometriquesNombre?: number
+    operationsAtypiques?: string
+    critAir?: string
+  }
+  usagesProfessionnels: AutovizaUsagePro[]
+  historique: AutovizaEvenementTimeline[]
+}
