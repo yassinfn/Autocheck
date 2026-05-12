@@ -74,28 +74,25 @@ export async function callClaudeVisionMulti(
 }
 
 export function extractJSON<T>(text: string): T {
-  // Strip markdown code fences (```json ... ``` or ``` ... ```)
-  const stripped = text
-    .replace(/^```(?:json)?\s*/m, '')
-    .replace(/\s*```\s*$/m, '')
-    .trim()
+  // Find the first { or [ and the last matching } or ]
+  // Works regardless of code fences, preamble text, or newline style
+  const firstBrace   = text.indexOf('{')
+  const firstBracket = text.indexOf('[')
 
-  // Try direct parse first
-  try {
-    return JSON.parse(stripped) as T
-  } catch {}
+  let start = -1
+  let closeChar = ''
+  if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+    start = firstBrace; closeChar = '}'
+  } else if (firstBracket !== -1) {
+    start = firstBracket; closeChar = ']'
+  }
 
-  // Fallback: extract JSON object from text
-  try {
-    const match = stripped.match(/\{[\s\S]*\}/)
-    if (match) return JSON.parse(match[0]) as T
-  } catch {}
-
-  // Fallback: extract JSON array
-  try {
-    const match = stripped.match(/\[[\s\S]*\]/)
-    if (match) return JSON.parse(match[0]) as T
-  } catch {}
+  if (start !== -1) {
+    const end = text.lastIndexOf(closeChar)
+    if (end > start) {
+      try { return JSON.parse(text.slice(start, end + 1)) as T } catch {}
+    }
+  }
 
   throw new Error(`JSON parse failed. Raw: ${text.slice(0, 300)}`)
 }
