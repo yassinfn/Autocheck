@@ -9,6 +9,7 @@ import type { AnalyseResult, ContactQuestionsResult, ContactVerdict, VisiteData,
 import VerdictBlock from '@/components/contact/VerdictBlock'
 import InspectionOverlay from '@/components/dashboard/InspectionOverlay'
 import DecisionBlock from '@/components/dashboard/DecisionBlock'
+import AnalyseDetails from '@/components/dashboard/AnalyseDetails'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -99,7 +100,7 @@ function Module({ id, icon, iconBg, title, subtitle, status, expanded, onToggle,
           : <ChevronRight size={18} className={`shrink-0 text-slate-400 transition-transform duration-200${expanded ? ' rotate-90' : ''}`} />
         }
       </button>
-      <div className={`transition-all duration-200 overflow-hidden${expanded ? ' max-h-[2400px]' : ' max-h-0'}`}>
+      <div className={`transition-all duration-200 overflow-hidden${expanded ? ' max-h-[6000px]' : ' max-h-0'}`}>
         {children && (
           <div className="border-t border-slate-200 px-5 py-5">
             {children}
@@ -747,27 +748,7 @@ function DashboardContent() {
             expanded={expandedModule === 1}
             onToggle={handleToggle}
           >
-            {analyse && (
-              <div className="space-y-3">
-                {analyse.score.ressentGlobal && (
-                  <p className="text-sm text-slate-600 leading-relaxed">{analyse.score.ressentGlobal}</p>
-                )}
-                {analyse.score.pointsAttention.length > 0 ? (
-                  <div className="space-y-2">
-                    {analyse.score.pointsAttention.map((risk, i) => (
-                      <div key={i} className="flex items-start gap-2.5 text-sm text-orange-700 bg-orange-50 rounded-lg px-3 py-2.5 border border-orange-100">
-                        <AlertTriangle size={14} className="shrink-0 mt-0.5 text-orange-500" />
-                        <span>{normalize(risk)}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2.5 border border-green-100">
-                    Aucun point d&apos;attention détecté.
-                  </p>
-                )}
-              </div>
-            )}
+            {analyse && <AnalyseDetails analyse={analyse} />}
           </Module>
 
           {/* Module 2 — Questions au vendeur */}
